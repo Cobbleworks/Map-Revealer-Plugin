@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/BerndHagen/Minecraft-Server-Plugins/raw/main/img/img_v1.0.1-mcplugin.png" alt="Map Revealer" width="128" />
+  <img src="images/plugin-logo.png" alt="Map Revealer" width="128" />
 </p>
 <h1 align="center">Map Revealer</h1>
 <p align="center">
@@ -58,3 +58,4 @@ Map Revealer is an open-source Minecraft plugin that allows players to instantly
 ### **License**
 
 This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+

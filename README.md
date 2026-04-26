@@ -59,3 +59,26 @@ Map Revealer is an open-source Minecraft plugin that allows players to instantly
 
 This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
+
+## **Screenshots**
+
+The screenshots below demonstrate the core features of the Map Revealer plugin, including instant map revealing, color scheme selection, depth rendering, and map locking.
+
+<table>
+  <tr>
+    <th>Map Revealer - Instant Reveal</th>
+    <th>Map Revealer - Color Schemes</th>
+  </tr>
+  <tr>
+    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-reveal.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-reveal.png" alt="Instant Reveal" width="450"></a></td>
+    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-schemes.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-schemes.png" alt="Color Schemes" width="450"></a></td>
+  </tr>
+  <tr>
+    <th>Map Revealer - Depth Rendering</th>
+    <th>Map Revealer - Map Locking</th>
+  </tr>
+  <tr>
+    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-depth.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-depth.png" alt="Depth Rendering" width="450"></a></td>
+    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-locking.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-locking.png" alt="Map Locking" width="450"></a></td>
+  </tr>
+</table>

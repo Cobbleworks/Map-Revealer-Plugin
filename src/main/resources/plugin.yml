@@ -1,0 +1,26 @@
+name: MapRevealer
+version: ${project.version}
+main: com.github.maprevealer.MapRevealerPlugin
+api-version: "1.20"
+description: Automatically reveal maps without walking to every chunk
+
+authors:
+  - MapRevealer
+
+commands:
+  revealmap:
+    description: Reveals the map you are holding with various options
+    usage: |
+      /revealmap - Reveal the map in your hand
+      /revealmap [depth] - Reveal at specific Y level
+      /revealmap [depth] [scheme] - Reveal with a color scheme
+      /revealmap lock - Lock map to prevent updates
+      /revealmap schemes - List available color schemes
+      /revealmap help - Show help
+    permission: maprevealer.reveal
+    aliases: [reveal, mapreveal]
+
+permissions:
+  maprevealer.reveal:
+    description: Allows the player to reveal and lock maps
+    default: op

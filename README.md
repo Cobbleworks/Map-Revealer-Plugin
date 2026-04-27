@@ -90,15 +90,15 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 ## **Screenshots**
 
-The screenshots below demonstrate the core features of the Map Revealer plugin, including instant map revealing, colour scheme selection, depth rendering, and map locking.
+The screenshots below demonstrate the core features of the Map Revealer plugin, including a nether-style generated map and revealing a full desert town map via command.
 
 <table>
   <tr>
-    <th>Map Revealer - Revealed Map</th>
-    <th>Map Revealer - Colour Schemes</th>
+    <th>Map Revealer - Nether Style Map</th>
+    <th>Map Revealer - Desert Town Reveal</th>
   </tr>
   <tr>
-    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-reveal.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-reveal.png" alt="Revealed Map" width="450"></a></td>
-    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-schemes.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-schemes.png" alt="Colour Schemes" width="450"></a></td>
+    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-nether-map.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-nether-map.png" alt="Nether Style Map" width="450"></a></td>
+    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-desert-reveal.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-desert-reveal.png" alt="Desert Town Reveal" width="450"></a></td>
   </tr>
 </table>

@@ -94,19 +94,19 @@ The screenshots below demonstrate the core features of the Map Revealer plugin, 
 
 <table>
   <tr>
-    <th>Map Revealer - Instant Reveal</th>
-    <th>Map Revealer - Color Schemes</th>
+    <th>Map Revealer - Autumn Style</th>
+    <th>Map Revealer - Nether Theme</th>
   </tr>
   <tr>
-    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-reveal.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-reveal.png" alt="Instant Reveal" width="450"></a></td>
-    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-schemes.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-schemes.png" alt="Color Schemes" width="450"></a></td>
+    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-autumn.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-autumn.png" alt="Autumn Style" width="450"></a></td>
+    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-nether.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-nether.png" alt="Nether Theme" width="450"></a></td>
   </tr>
   <tr>
-    <th>Map Revealer - Depth Rendering</th>
-    <th>Map Revealer - Map Locking</th>
+    <th>Map Revealer - Reveal Command</th>
+    <th>Map Revealer - Revealing Command</th>
   </tr>
   <tr>
-    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-depth.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-depth.png" alt="Depth Rendering" width="450"></a></td>
-    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-locking.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-locking.png" alt="Map Locking" width="450"></a></td>
+    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-reveal-command.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-reveal-command.png" alt="Reveal Command" width="450"></a></td>
+    <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-revealing-command.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-revealing-command.png" alt="Revealing Command" width="450"></a></td>
   </tr>
 </table>

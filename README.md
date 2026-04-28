@@ -1,4 +1,4 @@
-﻿<p align="center">
+<p align="center">
   <img src="images/plugin-logo.png" alt="Map Revealer Plugin" width="180" />
 </p>
 <h1 align="center">Map Revealer Plugin</h1>
@@ -10,13 +10,13 @@
   <a href="https://github.com/Cobbleworks/Map-Revealer-Plugin/releases"><img src="https://img.shields.io/github/v/release/Cobbleworks/Map-Revealer-Plugin?include_prereleases&style=flat-square&color=4CAF50" alt="Latest Release"></a>&nbsp;&nbsp;<a href="https://github.com/Cobbleworks/Map-Revealer-Plugin/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License"></a>&nbsp;&nbsp;<img src="https://img.shields.io/badge/Java-17+-orange?style=flat-square" alt="Java Version">&nbsp;&nbsp;<img src="https://img.shields.io/badge/Minecraft-1.20+-green?style=flat-square" alt="Minecraft Version">&nbsp;&nbsp;<img src="https://img.shields.io/badge/Platform-Spigot%2FPaper-yellow?style=flat-square" alt="Platform">&nbsp;&nbsp;<img src="https://img.shields.io/badge/Status-Active-brightgreen?style=flat-square" alt="Status">&nbsp;&nbsp;<a href="https://github.com/Cobbleworks/Map-Revealer-Plugin/issues"><img src="https://img.shields.io/github/issues/Cobbleworks/Map-Revealer-Plugin?style=flat-square&color=orange" alt="Open Issues"></a>
 </p>
 
-Map Revealer is an open-source Minecraft plugin that instantly reveals the full content of any map item without requiring the player to physically explore every chunk. Hold a filled map, run `/revealmap`, and the plugin asynchronously samples the world's terrain to fill every pixel -- surface colors by default, or a specific Y-level for cave and underground maps. Nine built-in color schemes (Normal, Withered, Ender, Mystic, Nether, Sepia, Grayscale, Inverted, Ocean, and Autumn) let you dramatically change the visual appearance of any revealed map. Maps revealed with a non-default scheme are automatically locked so Minecraft's own exploration system never overwrites the custom colors.
+Map Revealer is an open-source Minecraft plugin that instantly reveals the full content of any map item without requiring the player to physically explore every chunk. Hold a filled map, run `/revealmap`, and the plugin asynchronously samples the world's terrain to fill every pixel - surface colors by default, or a specific Y-level for cave and underground maps. Nine built-in color schemes (Normal, Withered, Ender, Mystic, Nether, Sepia, Grayscale, Inverted, Ocean, and Autumn) let you dramatically change the visual appearance of any revealed map. Maps revealed with a non-default scheme are automatically locked so Minecraft's own exploration system never overwrites the custom colors.
 
 Originally built to generate decorative and functional maps for custom server builds without endless walking, Map Revealer is designed to be minimal to install and simple to use. It requires no configuration files and no dependencies beyond a compatible server.
 
 ### **Core Features**
 
-- **Instant Full Reveal:** Fills all 128x128 pixels of the held map in a single command -- no chunk loading or player movement required
+- **Instant Full Reveal:** Fills all 128x128 pixels of the held map in a single command - no chunk loading or player movement required
 - **Asynchronous Processing:** The reveal runs on a background thread so the server main thread is never blocked, even for large or complex world maps
 - **Y-Level Depth Control:** Optional depth argument samples terrain at a specific Y coordinate instead of the surface, enabling accurate cave maps, underground base maps, and cross-section views
 - **9 Color Schemes:** Transform the visual style of any map with one of nine built-in themes: `normal`, `withered`, `ender`, `mystic`, `nether`, `sepia`, `grayscale`, `inverted`, `ocean`, `autumn`
@@ -31,7 +31,7 @@ Originally built to generate decorative and functional maps for custom server bu
 - **Server Software:** `Spigot`, `Paper`, `Purpur`, `CraftBukkit`
 - **Minecraft Versions:** `1.20` and higher
 - **Java Requirements:** `Java 17+`
-- **Dependencies:** None -- fully self-contained, no external plugins required
+- **Dependencies:** None - fully self-contained, no external plugins required
 
 ## **Table of Contents**
 
@@ -72,7 +72,7 @@ No additional plugins or libraries are needed. Map Revealer has zero external de
 1. Download the latest `MapRevealer-x.x.x.jar` from the [Releases](https://github.com/Cobbleworks/Map-Revealer-Plugin/releases) page
 2. **Stop your server completely** before placing any files
 3. Copy the `.jar` into your server's `plugins/` directory
-4. Start the server -- Map Revealer loads immediately with no setup required
+4. Start the server - Map Revealer loads immediately with no setup required
 
 ### **First Launch**
 
@@ -82,7 +82,7 @@ The only thing to check is whether players who should use the plugin have the `m
 
 ### **Verifying Installation**
 
-- Run `/plugins` in-game -- `MapRevealer` should appear green in the list
+- Run `/plugins` in-game - `MapRevealer` should appear green in the list
 - Run `/version MapRevealer` to confirm the installed version matches the release you downloaded
 - Hold a filled map, run `/revealmap`, and check that the map fills with terrain
 - If the plugin fails to load, check the server console for `MapRevealer` error messages (common causes: wrong Java version, corrupt JAR, or unsupported API version)
@@ -93,8 +93,8 @@ Map Revealer includes 9 color schemes that transform the visual appearance of re
 
 | Scheme | Description |
 |--------|-------------|
-| `normal` | Default Minecraft map colors -- standard terrain appearance |
-| `withered` | Faded, washed-out desaturated tones -- like an aged or worn map |
+| `normal` | Default Minecraft map colors - standard terrain appearance |
+| `withered` | Faded, washed-out desaturated tones - like an aged or worn map |
 | `ender` | Purple-tinted void colors - otherworldly End dimension feel |
 | `mystic` | Mystical blue-purple tones - magical, ethereal appearance |
 | `nether` | Fiery red-orange tones - dark volcanic underworld palette |
@@ -104,7 +104,7 @@ Map Revealer includes 9 color schemes that transform the visual appearance of re
 | `ocean` | Blue-green ocean tones - nautical, aquatic atmosphere |
 | `autumn` | Warm orange-brown autumn tones - seasonal forest palette |
 
-> **Auto-lock behavior:** Any scheme other than `normal` automatically locks the map after reveal to prevent Minecraft's exploration system from overwriting the custom colors. The `normal` scheme does not lock the map -- it remains live and will continue updating as players explore.
+> **Auto-lock behavior:** Any scheme other than `normal` automatically locks the map after reveal to prevent Minecraft's exploration system from overwriting the custom colors. The `normal` scheme does not lock the map - it remains live and will continue updating as players explore.
 
 ## **How It Works**
 
@@ -115,7 +115,7 @@ This is what happens step by step when a player runs `/revealmap`:
 1. The plugin confirms the player is holding a `FILLED_MAP` item with a valid `MapView`
 2. If a depth argument was provided, it is validated against the world's min/max Y bounds
 3. If a color scheme argument was provided, it is resolved from the `ColorScheme` enum; unknown arguments are rejected with an informational message
-4. The reveal task is submitted to Bukkit's **async scheduler** -- the main server thread is never blocked
+4. The reveal task is submitted to Bukkit's **async scheduler** - the main server thread is never blocked
 5. For every pixel in the 128x128 map grid, the corresponding world X/Z coordinate is calculated based on the map's center and scale
 6. If a depth was specified: the block at that exact Y coordinate is sampled for its map color. If no depth: the highest non-transparent block at surface level is sampled using `HeightMap.WORLD_SURFACE`
 7. The raw Minecraft map color byte is retrieved for each block and passed through the active `ColorScheme.transformColor()` method, which remaps the color ID to a different palette entry
@@ -125,19 +125,19 @@ This is what happens step by step when a player runs `/revealmap`:
 
 ### **Color Scheme Transformation**
 
-Each color scheme works by remapping the Minecraft map color byte using a `switch` expression. Minecraft's map color system uses base IDs (0-60+) multiplied by 4 and offset by a shade value (0-3, representing dark/normal/light/dimmer variants). The transformation preserves the shade for most schemes -- only the base color ID is remapped -- so depth shading in the original terrain is visually preserved in the transformed map.
+Each color scheme works by remapping the Minecraft map color byte using a `switch` expression. Minecraft's map color system uses base IDs (0-60+) multiplied by 4 and offset by a shade value (0-3, representing dark/normal/light/dimmer variants). The transformation preserves the shade for most schemes - only the base color ID is remapped - so depth shading in the original terrain is visually preserved in the transformed map.
 
 ### **Map Locking**
 
 Map locking disables two Minecraft map behaviors:
-- **Position tracking:** `MapView.setTrackingPosition(false)` -- the player cursor no longer moves on the map
+- **Position tracking:** `MapView.setTrackingPosition(false)` - the player cursor no longer moves on the map
 - **Auto-exploration updates:** The underlying NMS `WorldMap.locked` flag is set via reflection, which prevents Minecraft's chunk-loading system from overwriting the map's pixel data when players walk through the area
 
 The plugin accesses the NMS `locked` field by name (`locked` on modern versions, `e` on some older Paper mappings) via reflection, with graceful fallback if neither field is found.
 
 ## **Player Commands**
 
-All commands require the `maprevealer.reveal` permission. By default this is restricted to operators -- grant it to player groups as needed via your permission manager.
+All commands require the `maprevealer.reveal` permission. By default this is restricted to operators - grant it to player groups as needed via your permission manager.
 
 ### **Command Reference**
 
@@ -178,7 +178,7 @@ Reveals the map by sampling blocks at a specific Y coordinate instead of the sur
 ---
 
 **`/revealmap [depth] [scheme]`**  
-Combines depth control with a color scheme. The order of arguments is flexible -- the plugin will parse any integer as the depth and any recognized scheme name as the scheme, regardless of order.
+Combines depth control with a color scheme. The order of arguments is flexible - the plugin will parse any integer as the depth and any recognized scheme name as the scheme, regardless of order.
 
 ```
 /revealmap 64 sepia         # Sea level with sepia tones
@@ -190,7 +190,7 @@ Combines depth control with a color scheme. The order of arguments is flexible -
 ---
 
 **`/revealmap lock`**  
-Locks the held map immediately, preventing Minecraft from updating it when players walk through the mapped area. Use this to preserve any map's current appearance -- whether it was revealed with this plugin or filled naturally.
+Locks the held map immediately, preventing Minecraft from updating it when players walk through the mapped area. Use this to preserve any map's current appearance - whether it was revealed with this plugin or filled naturally.
 
 ```
 /revealmap lock
@@ -239,7 +239,7 @@ To allow all players to use the plugin, grant the permission to the default grou
 
 ## **Building from Source**
 
-Map Revealer uses **Apache Maven** as its build system. It is packaged as a standard plugin JAR -- no fat JAR or shading is required since the plugin has no external dependencies.
+Map Revealer uses **Apache Maven** as its build system. It is packaged as a standard plugin JAR - no fat JAR or shading is required since the plugin has no external dependencies.
 
 **Requirements:**
 - Java 17 or newer
@@ -275,7 +275,7 @@ src/main/
 
 ## **License**
 
-This project is licensed under the **MIT License** -- see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
 ## **Screenshots**
 

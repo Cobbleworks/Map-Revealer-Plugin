@@ -1,7 +1,7 @@
 <p align="center">
   <img src="images/plugin-logo.png" alt="Map Revealer Plugin" width="180" />
 </p>
-<h1 align="center">Map Revealer Plugin</h1>
+<h1 align="center">Map Revealer</h1>
 <p align="center">
   <b>Instantly reveal any Minecraft map without exploring every chunk.</b><br>
   <b>9 color schemes, Y-level depth control, and automatic map locking.</b>
@@ -283,24 +283,24 @@ The screenshots below demonstrate Map Revealer across several color schemes and 
 
 <table>
   <tr>
-    <th>Map Revealer Plugin - Sepia Theme (Item Frame)</th>
-    <th>Map Revealer Plugin - Grayscale Theme</th>
+    <th>Map Revealer - Sepia Theme (Item Frame)</th>
+    <th>Map Revealer - Grayscale Theme</th>
   </tr>
   <tr>
     <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-sepia-itemframe.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-sepia-itemframe.png" alt="Sepia Theme in Item Frame" width="450"></a></td>
     <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-grayscale-theme.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-grayscale-theme.png" alt="Grayscale Theme" width="450"></a></td>
   </tr>
   <tr>
-    <th>Map Revealer Plugin - Mystic Theme</th>
-    <th>Map Revealer Plugin - Autumn Theme</th>
+    <th>Map Revealer - Mystic Theme</th>
+    <th>Map Revealer - Autumn Theme</th>
   </tr>
   <tr>
     <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-mystic-theme.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-mystic-theme.png" alt="Mystic Theme" width="450"></a></td>
     <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-autumn-theme.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-autumn-theme.png" alt="Autumn Theme" width="450"></a></td>
   </tr>
   <tr>
-    <th>Map Revealer Plugin - Desert Reveal</th>
-    <th>Map Revealer Plugin - Nether Map</th>
+    <th>Map Revealer - Desert Reveal</th>
+    <th>Map Revealer - Nether Map</th>
   </tr>
   <tr>
     <td><a href="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-desert-reveal.png" target="_blank" rel="noopener noreferrer"><img src="https://github.com/Cobbleworks/Map-Revealer/raw/main/images/screenshot-desert-reveal.png" alt="Desert Reveal" width="450"></a></td>

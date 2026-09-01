@@ -17,6 +17,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Validates reveal options and delegates map rendering for the held map item.
+ */
 public class RevealMapCommand implements CommandExecutor, TabCompleter {
 
     private final MapRevealerPlugin plugin;

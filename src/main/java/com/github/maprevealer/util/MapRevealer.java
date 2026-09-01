@@ -6,6 +6,9 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.map.MapView;
 
+/**
+ * Renders explored terrain into a map canvas and applies the selected color scheme.
+ */
 public class MapRevealer {
 
     public static boolean lockMap(MapView mapView) {
@@ -316,6 +319,12 @@ public class MapRevealer {
     }
 
     private static byte getBaseColorForMaterial(Material material) {
+        // Mojang renamed CHAIN to IRON_CHAIN in 1.21.9. Comparing the enum name keeps
+        // map rendering compatible with servers on either side of that rename.
+        if (material.name().equals("CHAIN") || material.name().equals("IRON_CHAIN")) {
+            return (byte) (6 * 4 + 2);
+        }
+
         return switch (material) {
             case GRASS_BLOCK, SLIME_BLOCK -> (byte) (1 * 4 + 2);
             
@@ -341,7 +350,7 @@ public class MapRevealer {
 
             case IRON_BLOCK, IRON_DOOR, IRON_TRAPDOOR, BREWING_STAND,
                  HEAVY_WEIGHTED_PRESSURE_PLATE, IRON_BARS,
-                 CHAIN, LANTERN, SOUL_LANTERN -> (byte) (6 * 4 + 2);
+                 LANTERN, SOUL_LANTERN -> (byte) (6 * 4 + 2);
             
             case OAK_LEAVES, SPRUCE_LEAVES, BIRCH_LEAVES, JUNGLE_LEAVES,
                  ACACIA_LEAVES, DARK_OAK_LEAVES, MANGROVE_LEAVES, CHERRY_LEAVES,

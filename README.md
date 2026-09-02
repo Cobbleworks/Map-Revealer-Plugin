@@ -1,9 +1,10 @@
 <p align="center">
-  <img src="images/plugin-logo.png" alt="Map Revealer Plugin" width="200" height="200" />
+  <img src="images/plugin-banner.png" alt="Cobbleworks - Map Revealer Plugin banner" width="818" />
 </p>
-<h1 align="center">Map Revealer Plugin</h1>
+<h1 align="center">Cobbleworks - Map Revealer Plugin</h1>
 <p align="center">
-  <b>Fill a Minecraft map from world terrain with optional depth and color controls.</b>
+  <b>Fill a held Minecraft map directly from its world terrain without exploring every pixel first.</b><br>
+  <b>Render the surface or a chosen depth, apply themed palettes, and lock finished maps for displays.</b>
 </p>
 <p align="center">
   <a href="https://github.com/Cobbleworks/Map-Revealer-Plugin/releases"><img src="https://img.shields.io/github/v/release/Cobbleworks/Map-Revealer-Plugin?include_prereleases&style=flat-square&color=4CAF50" alt="Latest Release"></a>&nbsp;&nbsp;<a href="https://github.com/Cobbleworks/Map-Revealer-Plugin/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License"></a>&nbsp;&nbsp;<img src="https://img.shields.io/badge/Java-17+-orange?style=flat-square" alt="Java Version">&nbsp;&nbsp;<img src="https://img.shields.io/badge/Minecraft-1.20+-green?style=flat-square" alt="Minecraft Version">&nbsp;&nbsp;<img src="https://img.shields.io/badge/Platform-Spigot%2FPaper-yellow?style=flat-square" alt="Platform">
@@ -11,7 +12,7 @@
 
 Map Revealer renders the terrain covered by a filled map without requiring a player to explore it first. It can use the surface or a chosen Y-level, transform the result with a themed palette, and lock the finished map so normal exploration does not overwrite custom colors.
 
-### Core Features
+## Core Features
 
 - Renders all 128 × 128 pixels of the map held in the player's main hand
 - Supports surface rendering and fixed Y-level slices
@@ -22,7 +23,7 @@ Map Revealer renders the terrain covered by a filled map without requiring a pla
 - Processes the reveal with an asynchronous task and reports its duration
 - Requires no configuration file or third-party plugin
 
-### Supported Platforms
+## Supported Platforms
 
 - Minecraft 1.20 or newer
 - Spigot, Paper, Purpur, or a compatible Bukkit server
@@ -30,16 +31,18 @@ Map Revealer renders the terrain covered by a filled map without requiring a pla
 
 ## Table of Contents
 
-1. [Installation](#installation)
-2. [Third-Party Plugins](#third-party-plugins)
-3. [Using Map Revealer](#using-map-revealer)
-4. [Color Schemes](#color-schemes)
-5. [Commands](#commands)
-6. [Permissions](#permissions)
-7. [Operational Notes](#operational-notes)
-8. [Building From Source](#building-from-source)
-9. [License](#license)
-10. [Screenshots](#screenshots)
+1. [Core Features](#core-features)
+2. [Supported Platforms](#supported-platforms)
+3. [Installation](#installation)
+4. [Third-Party Plugins](#third-party-plugins)
+5. [Using Map Revealer](#using-map-revealer)
+6. [Color Schemes](#color-schemes)
+7. [Commands](#commands)
+8. [Permissions](#permissions)
+9. [Operational Notes](#operational-notes)
+10. [Building From Source](#building-from-source)
+11. [License](#license)
+12. [Screenshots](#screenshots)
 
 ## Installation
 
@@ -50,6 +53,8 @@ Map Revealer renders the terrain covered by a filled map without requiring a pla
 5. Hold a filled map in the main hand and run `/revealmap`.
 
 The plugin does not create a configuration file or data directory.
+
+For a first test, use a normal map at scale 0 in a familiar area. Once the result looks correct, try a themed scheme or a fixed depth. Copy valuable map items before experimenting: rendering replaces the pixel data on the held map rather than creating a separate item.
 
 ## Third-Party Plugins
 

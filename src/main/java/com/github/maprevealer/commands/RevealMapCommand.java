@@ -12,6 +12,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.MapMeta;
 import org.bukkit.map.MapView;
+import org.bukkit.World;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,6 +36,14 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if (args.length > 0 && args[0].equalsIgnoreCase("wall")) {
+            return handleWallCommand(player, Arrays.copyOfRange(args, 1, args.length));
+        }
+        if (!player.hasPermission("maprevealer.reveal")) {
+            player.sendMessage("§cYou do not have permission to reveal maps.");
+            return true;
+        }
+
         if (args.length > 0) {
             String subCommand = args[0].toLowerCase();
 
@@ -49,6 +58,7 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
             if (subCommand.equals("help")) {
                 return handleHelpCommand(player);
             }
+
         }
 
         return handleRevealCommand(player, args);
@@ -105,6 +115,9 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
         player.sendMessage("§e/revealmap [depth] [scheme] §7- Reveal with color scheme");
         player.sendMessage("§e/revealmap lock §7- Lock map to prevent updates");
         player.sendMessage("§e/revealmap schemes §7- List available color schemes");
+        if (player.hasPermission("maprevealer.wall.manage")) {
+            player.sendMessage("§e/revealmap wall §7- Manage automatically refreshed item-frame map walls");
+        }
         player.sendMessage("§e/revealmap help §7- Show this help");
         return true;
     }
@@ -128,6 +141,11 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
             player.sendMessage("§cCould not retrieve map view!");
             return true;
         }
+        World renderWorld = mapView.getWorld();
+        if (renderWorld == null) {
+            player.sendMessage("§cThis map is not associated with a loaded world!");
+            return true;
+        }
 
         Integer depth = null;
         ColorScheme colorScheme = ColorScheme.NORMAL;
@@ -135,10 +153,10 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
         for (String arg : args) {
             try {
                 int parsedDepth = Integer.parseInt(arg);
-                int minHeight = player.getWorld().getMinHeight();
-                int maxHeight = player.getWorld().getMaxHeight();
-                if (parsedDepth < minHeight || parsedDepth > maxHeight) {
-                    player.sendMessage("§cDepth must be between " + minHeight + " and " + maxHeight + "!");
+                int minHeight = renderWorld.getMinHeight();
+                int maxHeight = renderWorld.getMaxHeight();
+                if (parsedDepth < minHeight || parsedDepth >= maxHeight) {
+                    player.sendMessage("§cDepth must be between " + minHeight + " and " + (maxHeight - 1) + "!");
                     return true;
                 }
                 depth = parsedDepth;
@@ -162,30 +180,86 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
         String schemeInfo = colorScheme != ColorScheme.NORMAL ? " with §d" + colorScheme.getId() + "§a scheme" : "";
         player.sendMessage("§aRevealing map" + depthInfo + schemeInfo + "... This may take a moment.");
 
-        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
-            long startTime = System.currentTimeMillis();
-            
-            MapRevealer.revealMap(mapView, player.getWorld(), finalDepth, finalScheme);
-
+        long startTime = System.currentTimeMillis();
+        plugin.renderer().render(mapView, renderWorld, finalDepth, finalScheme, result -> {
+            if (!result.success()) {
+                if (player.isOnline()) player.sendMessage("§cMap reveal failed: " + result.error());
+                return;
+            }
             if (finalScheme != ColorScheme.NORMAL && !MapRevealer.isMapLocked(mapView)) {
                 MapRevealer.lockMap(mapView);
             }
-            
             long duration = System.currentTimeMillis() - startTime;
-
-            plugin.getServer().getScheduler().runTask(plugin, () -> {
-                player.sendMessage("§aMap revealed successfully! (Took " + duration + "ms)");
+            if (player.isOnline()) {
+                player.sendMessage("§aMap revealed successfully! §7(" + result.changedPixels()
+                        + " changed pixels, " + duration + "ms)");
                 player.sendMessage("§7Map Center: " + mapView.getCenterX() + ", " + mapView.getCenterZ());
                 player.sendMessage("§7Scale: " + mapView.getScale().name() + " (1:" + (1 << mapView.getScale().getValue()) + ")");
+                if (result.capturedChunks() < result.requestedChunks()) {
+                    player.sendMessage("§e" + (result.requestedChunks() - result.capturedChunks())
+                            + " ungenerated terrain chunks were left blank.");
+                }
                 if (finalDepth != null) {
                     player.sendMessage("§7Depth: Y=" + finalDepth);
                 }
                 if (finalScheme != ColorScheme.NORMAL) {
                     player.sendMessage("§7Color Scheme: " + finalScheme.getId() + " (map locked to preserve scheme)");
                 }
-            });
+            }
         });
 
+        return true;
+    }
+
+    private boolean handleWallCommand(Player player, String[] args) {
+        if (!player.hasPermission("maprevealer.wall.manage")) {
+            player.sendMessage("§cYou do not have permission to manage map walls.");
+            return true;
+        }
+        if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
+            player.sendMessage("§6=== Managed Map Walls ===");
+            player.sendMessage("§e/revealmap wall create <name> [scale] §7- Fill a connected rectangle of empty frames");
+            player.sendMessage("§e/revealmap wall expand <name> §7- Add connected empty frames");
+            player.sendMessage("§e/revealmap wall refresh <name|all> §7- Force a terrain refresh");
+            player.sendMessage("§e/revealmap wall set <name> interval <minutes>");
+            player.sendMessage("§e/revealmap wall set <name> <locked|markers|auto-expand> <on|off>");
+            player.sendMessage("§e/revealmap wall set <name> label <text|off>");
+            player.sendMessage("§e/revealmap wall list §7- Show managed walls");
+            player.sendMessage("§e/revealmap wall remove <name> §7- Stop managing without removing maps");
+            return true;
+        }
+
+        String action = args[0].toLowerCase();
+        String result;
+        switch (action) {
+            case "create" -> {
+                if (args.length < 2) result = "Usage: /revealmap wall create <name> [scale]";
+                else {
+                    try {
+                        Integer scale = args.length >= 3 ? Integer.parseInt(args[2]) : null;
+                        result = plugin.walls().create(player, args[1], scale);
+                    } catch (NumberFormatException exception) {
+                        result = "Scale must be a whole number.";
+                    }
+                }
+            }
+            case "expand" -> result = args.length < 2
+                    ? "Usage: /revealmap wall expand <name>" : plugin.walls().expand(player, args[1]);
+            case "refresh" -> result = args.length < 2
+                    ? "Usage: /revealmap wall refresh <name|all>" : plugin.walls().forceRefresh(args[1], player);
+            case "remove" -> result = args.length < 2
+                    ? "Usage: /revealmap wall remove <name>" : plugin.walls().remove(args[1]);
+            case "list" -> {
+                player.sendMessage("§6=== Managed Map Walls ===");
+                plugin.walls().list().forEach(line -> player.sendMessage("§7" + line));
+                return true;
+            }
+            case "set" -> result = args.length < 4
+                    ? "Usage: /revealmap wall set <name> <setting> <value>"
+                    : plugin.walls().configure(args[1], args[2], String.join(" ", Arrays.copyOfRange(args, 3, args.length)));
+            default -> result = "Unknown wall action. Use /revealmap wall help.";
+        }
+        player.sendMessage("§7" + result);
         return true;
     }
 
@@ -196,7 +270,8 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             String partial = args[0].toLowerCase();
 
-            List<String> subCommands = Arrays.asList("lock", "schemes", "colors", "help");
+            List<String> subCommands = new ArrayList<>(Arrays.asList("lock", "schemes", "colors", "help"));
+            if (sender.hasPermission("maprevealer.wall.manage")) subCommands.add("wall");
             for (String sub : subCommands) {
                 if (sub.startsWith(partial)) {
                     completions.add(sub);
@@ -208,6 +283,8 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
                     completions.add(scheme.getId());
                 }
             }
+        } else if (args[0].equalsIgnoreCase("wall")) {
+            return completeWall(args);
         } else if (args.length == 2) {
             String partial = args[1].toLowerCase();
 
@@ -223,5 +300,35 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
         }
         
         return completions;
+    }
+
+    private List<String> completeWall(String[] args) {
+        if (args.length == 2) {
+            return prefix(List.of("create", "expand", "refresh", "set", "list", "remove", "help"), args[1]);
+        }
+        if (args.length == 3 && List.of("expand", "set", "remove").contains(args[1].toLowerCase())) {
+            return prefix(plugin.walls().names(), args[2]);
+        }
+        if (args.length == 3 && args[1].equalsIgnoreCase("refresh")) {
+            List<String> names = new ArrayList<>(plugin.walls().names());
+            names.add("all");
+            return prefix(names, args[2]);
+        }
+        if (args.length == 4 && args[1].equalsIgnoreCase("set")) {
+            return prefix(List.of("interval", "locked", "markers", "auto-expand", "label"), args[3]);
+        }
+        if (args.length == 5 && args[1].equalsIgnoreCase("set")
+                && List.of("locked", "markers", "auto-expand").contains(args[3].toLowerCase())) {
+            return prefix(List.of("on", "off"), args[4]);
+        }
+        if (args.length == 4 && args[1].equalsIgnoreCase("create")) {
+            return prefix(List.of("0", "1"), args[3]);
+        }
+        return List.of();
+    }
+
+    private static List<String> prefix(List<String> values, String partial) {
+        String lower = partial.toLowerCase();
+        return values.stream().filter(value -> value.toLowerCase().startsWith(lower)).toList();
     }
 }

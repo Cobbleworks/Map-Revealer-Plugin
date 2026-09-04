@@ -3,11 +3,10 @@ package com.github.maprevealer.util;
 import org.bukkit.HeightMap;
 import org.bukkit.Material;
 import org.bukkit.World;
-import org.bukkit.block.Block;
 import org.bukkit.map.MapView;
 
 /**
- * Renders explored terrain into a map canvas and applies the selected color scheme.
+ * Converts terrain samples into persistent Minecraft map colors.
  */
 public class MapRevealer {
 
@@ -15,60 +14,15 @@ public class MapRevealer {
         try {
             mapView.setTrackingPosition(false);
             mapView.setUnlimitedTracking(false);
-            lockMapNMS(mapView);
+            mapView.setLocked(true);
             return true;
-        } catch (Exception e) {
+        } catch (RuntimeException exception) {
             return false;
         }
     }
 
-    private static void lockMapNMS(MapView mapView) {
-        try {
-            var craftMapView = mapView;
-            var worldMapField = craftMapView.getClass().getDeclaredField("worldMap");
-            worldMapField.setAccessible(true);
-            var worldMap = worldMapField.get(craftMapView);
-
-            if (worldMap != null) {
-                try {
-                    var lockedField = worldMap.getClass().getDeclaredField("locked");
-                    lockedField.setAccessible(true);
-                    lockedField.set(worldMap, true);
-                } catch (NoSuchFieldException e) {
-                    try {
-                        var lockedField = worldMap.getClass().getDeclaredField("e");
-                        lockedField.setAccessible(true);
-                        lockedField.set(worldMap, true);
-                    } catch (Exception ignored) {}
-                }
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
     public static boolean isMapLocked(MapView mapView) {
-        try {
-            var craftMapView = mapView;
-            var worldMapField = craftMapView.getClass().getDeclaredField("worldMap");
-            worldMapField.setAccessible(true);
-            var worldMap = worldMapField.get(craftMapView);
-
-            if (worldMap != null) {
-                try {
-                    var lockedField = worldMap.getClass().getDeclaredField("locked");
-                    lockedField.setAccessible(true);
-                    return (boolean) lockedField.get(worldMap);
-                } catch (NoSuchFieldException e) {
-                    try {
-                        var lockedField = worldMap.getClass().getDeclaredField("e");
-                        lockedField.setAccessible(true);
-                        return (boolean) lockedField.get(worldMap);
-                    } catch (Exception ignored) {}
-                }
-            }
-        } catch (Exception ignored) {}
-        
-        return !mapView.isTrackingPosition();
+        return mapView.isLocked();
     }
 
     private static final int MAP_SIZE = 128;
@@ -86,10 +40,14 @@ public class MapRevealer {
     }
 
     public static void revealMap(MapView mapView, World world, Integer depth, ColorScheme colorScheme) {
-        int centerX = mapView.getCenterX();
-        int centerZ = mapView.getCenterZ();
-        int scale = 1 << mapView.getScale().getValue();
+        byte[] pixels = renderPixels(new WorldTerrainReader(world), mapView.getCenterX(), mapView.getCenterZ(),
+                1 << mapView.getScale().getValue(), depth, colorScheme);
+        MapDataAccess.write(mapView, pixels);
+    }
 
+    public static byte[] renderPixels(TerrainReader terrain, int centerX, int centerZ, int scale,
+                                      Integer depth, ColorScheme colorScheme) {
+        byte[] pixels = new byte[MAP_SIZE * MAP_SIZE];
         int halfMapBlocks = (MAP_SIZE / 2) * scale;
 
         int[][] heights = new int[MAP_SIZE][MAP_SIZE];
@@ -101,7 +59,7 @@ public class MapRevealer {
                 int worldX = centerX - halfMapBlocks + (pixelX * scale) + (scale / 2);
                 int worldZ = centerZ - halfMapBlocks + (pixelZ * scale) + (scale / 2);
 
-                HeightColorData data = getHeightAndColor(world, worldX, worldZ, depth);
+                HeightColorData data = getHeightAndColor(terrain, worldX, worldZ, depth);
                 heights[pixelX][pixelZ] = data.height;
                 baseColors[pixelX][pixelZ] = data.baseColor;
                 isWater[pixelX][pixelZ] = data.isWater;
@@ -123,9 +81,10 @@ public class MapRevealer {
                     finalColor = scheme.transformColor(applyShade(baseColor, shade));
                 }
                 
-                setMapPixel(mapView, pixelX, pixelZ, finalColor);
+                pixels[pixelX + pixelZ * MAP_SIZE] = finalColor;
             }
         }
+        return pixels;
     }
 
     private static class HeightColorData {
@@ -140,35 +99,35 @@ public class MapRevealer {
         }
     }
 
-    private static HeightColorData getHeightAndColor(World world, int worldX, int worldZ, Integer depth) {
+    private static HeightColorData getHeightAndColor(TerrainReader terrain, int worldX, int worldZ, Integer depth) {
         int startY;
         
         if (depth != null) {
             startY = depth;
         } else {
-            startY = world.getHighestBlockYAt(worldX, worldZ, HeightMap.WORLD_SURFACE);
-        }
-        
-        Block block = world.getBlockAt(worldX, startY, worldZ);
-        
-        while (block.getType().isAir() || isFullyTransparent(block.getType())) {
-            startY--;
-            if (startY < world.getMinHeight()) {
-                return new HeightColorData(world.getMinHeight(), (byte) 0, false);
-            }
-            block = world.getBlockAt(worldX, startY, worldZ);
+            startY = terrain.getHighestBlockYAt(worldX, worldZ);
         }
 
-        if (block.getType() == Material.WATER) {
-            byte waterColor = getWaterColor(world, worldX, startY, worldZ);
+        Material block = terrain.getBlockType(worldX, startY, worldZ);
+        
+        while (block.isAir() || isFullyTransparent(block)) {
+            startY--;
+            if (startY < terrain.getMinHeight()) {
+                return new HeightColorData(terrain.getMinHeight(), (byte) 0, false);
+            }
+            block = terrain.getBlockType(worldX, startY, worldZ);
+        }
+
+        if (block == Material.WATER) {
+            byte waterColor = getWaterColor(terrain, worldX, startY, worldZ);
             return new HeightColorData(startY, waterColor, true);
         }
 
-        if (isFoliage(block.getType())) {
-            byte foliageColor = getBaseColorForMaterial(block.getType());
+        if (isFoliage(block)) {
+            byte foliageColor = getBaseColorForMaterial(block);
             int groundY = startY - 1;
-            while (groundY > world.getMinHeight()) {
-                Material below = world.getBlockAt(worldX, groundY, worldZ).getType();
+            while (groundY > terrain.getMinHeight()) {
+                Material below = terrain.getBlockType(worldX, groundY, worldZ);
                 if (!below.isAir() && !isFullyTransparent(below) && !isFoliage(below)) {
                     break;
                 }
@@ -177,7 +136,7 @@ public class MapRevealer {
             return new HeightColorData(groundY, foliageColor, false);
         }
 
-        byte baseColor = getBaseColorForMaterial(block.getType());
+        byte baseColor = getBaseColorForMaterial(block);
         return new HeightColorData(startY, baseColor, false);
     }
 
@@ -251,11 +210,11 @@ public class MapRevealer {
         };
     }
 
-    private static byte getWaterColor(World world, int x, int surfaceY, int z) {
+    private static byte getWaterColor(TerrainReader terrain, int x, int surfaceY, int z) {
         int depth = 0;
         int y = surfaceY;
         
-        while (y > world.getMinHeight() && world.getBlockAt(x, y, z).getType() == Material.WATER) {
+        while (y > terrain.getMinHeight() && terrain.getBlockType(x, y, z) == Material.WATER) {
             depth++;
             y--;
         }
@@ -269,52 +228,26 @@ public class MapRevealer {
         }
     }
 
-    private static void setMapPixel(MapView mapView, int x, int z, byte color) {
-        try {
-            var world = mapView.getWorld();
-            if (world != null) {
-                int mapId = mapView.getId();
-                
-                var server = org.bukkit.Bukkit.getServer();
-                var mapDataMethod = server.getClass().getMethod("getMap", int.class);
-                var mapViewFromServer = (MapView) mapDataMethod.invoke(server, mapId);
-                
-                if (mapViewFromServer != null) {
-                }
-            }
-        } catch (Exception ignored) {
-        }
-
-        setMapPixelNMS(mapView, x, z, color);
+    public interface TerrainReader {
+        Material getBlockType(int worldX, int y, int worldZ);
+        int getHighestBlockYAt(int worldX, int worldZ);
+        int getMinHeight();
     }
 
-    private static void setMapPixelNMS(MapView mapView, int x, int z, byte color) {
-        try {
-            var craftMapView = mapView;
-            var worldMapField = craftMapView.getClass().getDeclaredField("worldMap");
-            worldMapField.setAccessible(true);
-            var worldMap = worldMapField.get(craftMapView);
+    private record WorldTerrainReader(World world) implements TerrainReader {
+        @Override
+        public Material getBlockType(int worldX, int y, int worldZ) {
+            return world.getBlockAt(worldX, y, worldZ).getType();
+        }
 
-            if (worldMap != null) {
-                var colorsField = worldMap.getClass().getDeclaredField("colors");
-                colorsField.setAccessible(true);
-                byte[] colors = (byte[]) colorsField.get(worldMap);
+        @Override
+        public int getHighestBlockYAt(int worldX, int worldZ) {
+            return world.getHighestBlockYAt(worldX, worldZ, HeightMap.WORLD_SURFACE);
+        }
 
-                if (colors != null && x >= 0 && x < 128 && z >= 0 && z < 128) {
-                    colors[x + z * 128] = color;
-                }
-
-                try {
-                    var setColorsDirtyMethod = worldMap.getClass().getMethod("setColorsDirty", int.class, int.class);
-                    setColorsDirtyMethod.invoke(worldMap, x, z);
-                } catch (NoSuchMethodException e) {
-                    try {
-                        var flagDirtyMethod = worldMap.getClass().getMethod("a", int.class, int.class);
-                        flagDirtyMethod.invoke(worldMap, x, z);
-                    } catch (Exception ignored) {}
-                }
-            }
-        } catch (Exception e) {
+        @Override
+        public int getMinHeight() {
+            return world.getMinHeight();
         }
     }
 

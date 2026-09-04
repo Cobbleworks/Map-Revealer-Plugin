@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Added persistent, automatically refreshed item-frame and glow-item-frame map walls.
+- Added safe creation for empty rectangular frame grids and in-place adoption of correctly aligned existing maps.
+- Added per-wall refresh intervals, locked/unlocked state, optional player markers, an origin-map region label, and opt-in automatic expansion.
+- Added wall list, create, expand, configure, remove, and force-refresh commands.
+- Added `walls.yml` persistence for wall options, frame UUIDs, map IDs, centers, slots, and render hashes.
+
+### Changed
+
+- Replaced off-thread Bukkit world access with a queued snapshot pipeline: generated chunks load asynchronously, immutable snapshots are processed off-thread, and map buffers are changed on the server thread.
+- Map updates now compare pixel buffers and mark only changed map regions dirty.
+- Map locking now uses Bukkit's public `MapView#setLocked` API instead of reflective field access.
+
+### Security
+
+- Wall creation aborts on non-map items, irregular grids, ownership conflicts, invalid maps, or mismatched map centers/scales.
+- Existing map IDs are preserved, wall removal leaves frames and map items in place, and automatic expansion only claims newly placed empty frames when explicitly enabled.
+- A generated chunk that cannot be captured aborts that map refresh instead of clearing the affected region as though it were empty terrain.
+- Existing map IDs cannot be claimed by two managed walls, and a failed creation restores the original items, rotations, ownership data, and map settings.
+
 ## [1.0.0] - 2026-04-28
 
 Map Revealer v1.0.0 is the initial release, delivering instant asynchronous map reveals with nine color schemes, Y-level depth control, and automatic map locking — no configuration required.

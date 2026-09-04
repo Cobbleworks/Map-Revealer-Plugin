@@ -2,7 +2,7 @@ name: MapRevealer
 version: ${project.version}
 main: com.github.maprevealer.MapRevealerPlugin
 api-version: "1.20"
-description: Automatically reveal maps without walking to every chunk
+description: Reveal held maps and automatically refresh item-frame map walls
 
 authors:
   - Cobbleworks
@@ -17,11 +17,14 @@ commands:
       /revealmap [depth] [scheme] - Reveal with a color scheme
       /revealmap lock - Lock map to prevent updates
       /revealmap schemes - List available color schemes
+      /revealmap wall - Manage automatically refreshed item-frame map walls
       /revealmap help - Show help
-    permission: maprevealer.reveal
     aliases: [reveal, mapreveal]
 
 permissions:
   maprevealer.reveal:
-    description: Allows the player to reveal and lock maps
+    description: Allows the player to reveal and lock held maps
+    default: op
+  maprevealer.wall.manage:
+    description: Create, configure, expand, refresh, and remove managed map walls
     default: op

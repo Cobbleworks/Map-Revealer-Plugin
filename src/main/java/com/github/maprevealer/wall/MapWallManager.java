@@ -63,6 +63,7 @@ public final class MapWallManager implements Listener {
     private final NamespacedKey mapKey;
     private final Map<String, MapWall> walls = new LinkedHashMap<>();
     private final Set<String> refreshingWalls = new HashSet<>();
+    private final Set<String> pendingRefreshes = new HashSet<>();
 
     public MapWallManager(MapRevealerPlugin plugin, MapRenderService renderer) {
         this.plugin = plugin;
@@ -99,7 +100,7 @@ public final class MapWallManager implements Listener {
         MapView originMap = mapInFrame(target);
         int scaleValue = originMap == null ? (requestedScale == null ? 0 : requestedScale)
                 : originMap.getScale().getValue();
-        int maxScale = Math.max(0, Math.min(4, plugin.getConfig().getInt("map-walls.max-scale", 1)));
+        int maxScale = Math.max(0, Math.min(4, plugin.getConfig().getInt("map-walls.max-scale", 4)));
         if (scaleValue < 0 || scaleValue > maxScale) return "Wall map scale must be between 0 and " + maxScale + ".";
         if (originMap != null && requestedScale != null && requestedScale != scaleValue) {
             return "The selected map uses scale " + scaleValue + ", not scale " + requestedScale + ".";
@@ -201,7 +202,9 @@ public final class MapWallManager implements Listener {
         if (walls.isEmpty()) return List.of("No managed map walls exist.");
         return walls.values().stream().map(wall -> wall.name() + ": " + wall.frames().size()
                 + " maps, every " + wall.refreshMinutes() + " min, locked=" + wall.locked()
-                + ", markers=" + wall.playerMarkers() + ", auto-expand=" + wall.autoExpand()).toList();
+                + ", markers=" + wall.playerMarkers() + ", theme=" + wall.scheme.getId()
+                + ", depth=" + (wall.depth == null ? "auto" : wall.depth)
+                + ", auto-expand=" + wall.autoExpand()).toList();
     }
 
     public String forceRefresh(String rawName, CommandSender sender) {
@@ -219,7 +222,29 @@ public final class MapWallManager implements Listener {
         MapWall wall = walls.get(normalizeName(rawName));
         if (wall == null) return "No managed wall named '" + rawName + "' exists.";
         String option = rawOption.toLowerCase(Locale.ROOT);
+        boolean renderChanged = false;
         switch (option) {
+            case "theme", "scheme" -> {
+                ColorScheme scheme = ColorScheme.fromString(rawValue);
+                if (scheme == null) return "Unknown theme. Use /revealmap schemes to list themes.";
+                wall.scheme = scheme;
+                renderChanged = true;
+            }
+            case "depth" -> {
+                if (rawValue.equalsIgnoreCase("auto") || rawValue.equalsIgnoreCase("surface")) wall.depth = null;
+                else {
+                    World world = Bukkit.getWorld(wall.worldId());
+                    if (world == null) return "The wall's world is not loaded.";
+                    try {
+                        int depth = Integer.parseInt(rawValue);
+                        if (depth < world.getMinHeight() || depth >= world.getMaxHeight()) {
+                            return "Depth must be between " + world.getMinHeight() + " and " + (world.getMaxHeight() - 1) + ".";
+                        }
+                        wall.depth = depth;
+                    } catch (NumberFormatException exception) { return "Depth must be a Y-level or auto."; }
+                }
+                renderChanged = true;
+            }
             case "interval" -> {
                 try {
                     long minutes = Long.parseLong(rawValue);
@@ -234,6 +259,7 @@ public final class MapWallManager implements Listener {
             case "locked" -> {
                 Boolean value = parseBoolean(rawValue);
                 if (value == null) return "Use on or off for the locked setting.";
+                if (!value && requiresLock(wall)) return "Themed, depth, and Nether maps must stay locked to preserve their rendering.";
                 wall.locked(value);
             }
             case "markers" -> {
@@ -247,16 +273,20 @@ public final class MapWallManager implements Listener {
                 wall.autoExpand(value);
             }
             case "label" -> wall.label(rawValue.equalsIgnoreCase("off") ? "" : rawValue.substring(0, Math.min(48, rawValue.length())));
-            default -> { return "Unknown setting. Use interval, locked, markers, auto-expand, or label."; }
+            default -> { return "Unknown setting. Use theme, depth, interval, locked, markers, auto-expand, or label."; }
         }
+        if (requiresLock(wall)) wall.locked(true);
         applyWallOptions(wall);
         save();
+        if (renderChanged) refresh(wall, null, true);
         return "Updated " + option + " for '" + wall.name() + "'.";
     }
 
     public List<String> names() {
         return List.copyOf(walls.keySet());
     }
+
+    public boolean isRefreshing(String name) { return refreshingWalls.contains(normalizeName(name)); }
 
     private WallFrame attachFrame(MapWall wall, ItemFrame frame, int row, int column,
                                   int centerX, int centerZ, MapView.Scale scale) {
@@ -268,6 +298,7 @@ public final class MapWallManager implements Listener {
         if (map == null) {
             if (!item.getType().isAir()) throw new IllegalStateException("a filled map has invalid map data");
             map = Bukkit.createMap(frame.getWorld());
+            map.setWorld(frame.getWorld());
             map.setCenterX(centerX);
             map.setCenterZ(centerZ);
             map.setScale(scale);
@@ -275,6 +306,7 @@ public final class MapWallManager implements Listener {
         }
         map.setTrackingPosition(false);
         map.setUnlimitedTracking(false);
+        if (requiresLock(wall)) wall.locked(true);
         map.setLocked(wall.locked());
 
         MapMeta meta = (MapMeta) item.getItemMeta();
@@ -301,6 +333,7 @@ public final class MapWallManager implements Listener {
 
     private void refresh(MapWall wall, CommandSender sender, boolean forced) {
         if (!refreshingWalls.add(wall.name())) {
+            if (forced) pendingRefreshes.add(wall.name());
             if (sender != null) sender.sendMessage("Map wall '" + wall.name() + "' already has a refresh in progress.");
             return;
         }
@@ -328,13 +361,53 @@ public final class MapWallManager implements Listener {
             }
             map.setLocked(wall.locked());
             attachOverlay(wall, frame, map);
-            renderer.render(map, world, null, ColorScheme.NORMAL, result -> {
+            renderer.render(map, world, wall.depth, wall.scheme, result -> {
                 if (result.success()) frame.lastHash(result.hash());
+                if (result.success() && validManagedMap(wall, frame)) sendFrameMap(wall, frame, null);
+                if (!result.success()) plugin.getLogger().warning("Wall '" + wall.name() + "', map " + frame.mapId() + ": " + result.error());
                 progress.complete(result);
                 if (progress.done()) save();
             });
         }
         if (!forced) save();
+    }
+
+    private boolean requiresLock(MapWall wall) {
+        World world = Bukkit.getWorld(wall.worldId());
+        return wall.scheme != ColorScheme.NORMAL || wall.depth != null
+                || (world != null && world.getEnvironment() == World.Environment.NETHER);
+    }
+
+    private void sendFrameMap(MapWall wall, WallFrame frame, Player onlyViewer) {
+        Entity entity = Bukkit.getEntity(frame.entityId());
+        MapView map = Bukkit.getMap(frame.mapId());
+        if (!(entity instanceof ItemFrame itemFrame) || map == null || !validManagedMap(wall, frame)) return;
+        List<Player> viewers = onlyViewer == null ? itemFrame.getWorld().getPlayers() : List.of(onlyViewer);
+        for (Player viewer : viewers) {
+            if (viewer.isOnline() && viewer.getWorld().equals(itemFrame.getWorld())
+                    && viewer.getLocation().distanceSquared(itemFrame.getLocation()) <= 64 * 64) viewer.sendMap(map);
+        }
+    }
+
+    private void resendWalls(Player viewer) {
+        int delay = 10;
+        for (MapWall wall : walls.values()) {
+            if (!viewer.getWorld().getUID().equals(wall.worldId())) continue;
+            for (WallFrame frame : wall.frames()) {
+                plugin.getServer().getScheduler().runTaskLater(plugin, () -> sendFrameMap(wall, frame, viewer), delay++ / 4);
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPlayerJoin(org.bukkit.event.player.PlayerJoinEvent event) { resendWalls(event.getPlayer()); }
+
+    @EventHandler
+    public void onPlayerChangedWorld(org.bukkit.event.player.PlayerChangedWorldEvent event) { resendWalls(event.getPlayer()); }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerTeleport(org.bukkit.event.player.PlayerTeleportEvent event) {
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> resendWalls(event.getPlayer()), 20L);
     }
 
     private boolean validManagedMap(MapWall wall, WallFrame frame) {
@@ -348,6 +421,7 @@ public final class MapWallManager implements Listener {
     }
 
     private void applyWallOptions(MapWall wall) {
+        if (requiresLock(wall)) wall.locked(true);
         for (WallFrame frame : wall.frames()) {
             MapView map = Bukkit.getMap(frame.mapId());
             if (map != null) {
@@ -605,6 +679,10 @@ public final class MapWallManager implements Listener {
                         section.getBoolean("player-markers", false), section.getBoolean("auto-expand", false),
                         section.getString("label", ""), interval,
                         section.getLong("next-refresh", System.currentTimeMillis() + interval * 60_000L), frames));
+                MapWall loaded = walls.get(name);
+                ColorScheme scheme = ColorScheme.fromString(section.getString("theme", "normal"));
+                loaded.scheme = scheme == null ? ColorScheme.NORMAL : scheme;
+                loaded.depth = section.contains("depth") ? section.getInt("depth") : null;
             } catch (IllegalArgumentException exception) {
                 plugin.getLogger().warning("Skipping invalid map wall '" + name + "': " + exception.getMessage());
             }
@@ -620,6 +698,8 @@ public final class MapWallManager implements Listener {
             yaml.set(path + ".player-markers", wall.playerMarkers());
             yaml.set(path + ".auto-expand", wall.autoExpand());
             yaml.set(path + ".label", wall.label());
+            yaml.set(path + ".theme", wall.scheme.getId());
+            yaml.set(path + ".depth", wall.depth);
             yaml.set(path + ".refresh-minutes", wall.refreshMinutes());
             yaml.set(path + ".next-refresh", wall.nextRefresh());
             yaml.set(path + ".frames", wall.frames().stream().map(frame -> {
@@ -664,6 +744,8 @@ public final class MapWallManager implements Listener {
         private boolean playerMarkers;
         private boolean autoExpand;
         private String label;
+        private ColorScheme scheme = ColorScheme.NORMAL;
+        private Integer depth;
         private long refreshMinutes;
         private long nextRefresh;
         private final List<WallFrame> frames;
@@ -732,6 +814,8 @@ public final class MapWallManager implements Listener {
         private int changedMaps;
         private int changedPixels;
         private int failures;
+        private int missingChunks;
+        private String firstError;
         private final CommandSender sender;
         private final String wall;
 
@@ -743,16 +827,32 @@ public final class MapWallManager implements Listener {
 
         private void complete(MapRenderService.RenderResult result) {
             remaining--;
-            if (!result.success()) failures++;
+            if (!result.success()) {
+                failures++;
+                if (firstError == null) firstError = result.error();
+            }
             else if (result.changedPixels() > 0) {
                 changedMaps++;
                 changedPixels += result.changedPixels();
             }
+            if (result.success()) missingChunks += result.requestedChunks() - result.capturedChunks();
             if (remaining == 0 && sender != null) {
                 sender.sendMessage("Map wall '" + wall + "' refreshed: " + changedMaps + " changed maps, "
-                        + changedPixels + " changed pixels" + (failures == 0 ? "." : ", " + failures + " failures."));
+                        + changedPixels + " changed pixels" + (failures == 0 ? "." : ", " + failures + " failures: " + firstError));
+                if (missingChunks > 0) sender.sendMessage("Ungenerated terrain was left transparent. Enable rendering.generate-missing-chunks to include new terrain.");
             }
-            if (remaining == 0) refreshingWalls.remove(wall);
+            if (remaining == 0) {
+                refreshingWalls.remove(wall);
+                MapWall definition = walls.get(wall);
+                if (definition != null) {
+                    if (pendingRefreshes.remove(wall)) plugin.getServer().getScheduler().runTask(plugin, () -> refresh(definition, null, true));
+                    // A second pass after all maps finish repairs stale client frame textures.
+                    int delay = 20;
+                    for (WallFrame frame : definition.frames()) {
+                        plugin.getServer().getScheduler().runTaskLater(plugin, () -> sendFrameMap(definition, frame, null), delay++ / 4);
+                    }
+                }
+            }
         }
 
         private boolean done() { return remaining == 0; }

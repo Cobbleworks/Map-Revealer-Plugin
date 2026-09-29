@@ -15,6 +15,13 @@ public class MapRevealerPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        // Upgrade only the old shipped limits; preserve administrator-customized limits.
+        if (!getConfig().contains("config-version", true)) {
+            if (getConfig().getInt("map-walls.max-scale", 4) == 1) getConfig().set("map-walls.max-scale", 4);
+            if (getConfig().getInt("rendering.max-chunks-per-map", 16384) == 4096) getConfig().set("rendering.max-chunks-per-map", 16384);
+            getConfig().set("config-version", 2);
+            saveConfig();
+        }
         renderer = new MapRenderService(this);
         walls = new MapWallManager(this, renderer);
         getServer().getPluginManager().registerEvents(walls, this);

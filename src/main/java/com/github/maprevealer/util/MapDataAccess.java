@@ -32,11 +32,20 @@ public final class MapDataAccess {
             Method dirty = findDirtyMethod(worldMap.getClass());
             if (dirty == null) throw new NoSuchMethodException("setColorsDirty(int, int)");
             int changed = 0;
+            int minX = 128, minZ = 128, maxX = -1, maxZ = -1;
             for (int index = 0; index < PIXELS; index++) {
                 if (colors[index] == replacement[index]) continue;
                 colors[index] = replacement[index];
                 changed++;
-                dirty.invoke(worldMap, index % 128, index / 128);
+                minX = Math.min(minX, index % 128);
+                maxX = Math.max(maxX, index % 128);
+                minZ = Math.min(minZ, index / 128);
+                maxZ = Math.max(maxZ, index / 128);
+            }
+            // Two corners invalidate the complete changed rectangle without 16,384 reflective calls.
+            if (changed > 0) {
+                invokeDirty(dirty, worldMap, minX, minZ);
+                if (maxX != minX || maxZ != minZ) invokeDirty(dirty, worldMap, maxX, maxZ);
             }
             return changed;
         } catch (ReflectiveOperationException exception) {
@@ -109,13 +118,21 @@ public final class MapDataAccess {
     private static Method findDirtyMethod(Class<?> type) {
         for (Class<?> current = type; current != null; current = current.getSuperclass()) {
             for (String name : new String[]{"setColorsDirty", "a"}) {
-                try {
-                    Method method = current.getDeclaredMethod(name, int.class, int.class);
-                    method.setAccessible(true);
-                    return method;
-                } catch (NoSuchMethodException ignored) { }
+                for (Class<?>[] signature : new Class<?>[][]{
+                        {int.class, int.class}, {int.class, int.class, boolean.class}}) {
+                    try {
+                        Method method = current.getDeclaredMethod(name, signature);
+                        method.setAccessible(true);
+                        return method;
+                    } catch (NoSuchMethodException ignored) { }
+                }
             }
         }
         return null;
+    }
+
+    private static void invokeDirty(Method method, Object owner, int x, int z) throws ReflectiveOperationException {
+        if (method.getParameterCount() == 3) method.invoke(owner, x, z, true);
+        else method.invoke(owner, x, z);
     }
 }

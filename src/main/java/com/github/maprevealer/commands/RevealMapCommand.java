@@ -61,7 +61,8 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
 
         }
 
-        return handleRevealCommand(player, args);
+        return handleRevealCommand(player, args.length > 0 && args[0].equalsIgnoreCase("reveal")
+                ? Arrays.copyOfRange(args, 1, args.length) : args);
     }
 
     private boolean handleLockCommand(Player player) {
@@ -113,6 +114,7 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
         player.sendMessage("§e/revealmap §7- Reveal the map in your hand");
         player.sendMessage("§e/revealmap [depth] §7- Reveal at specific Y level");
         player.sendMessage("§e/revealmap [depth] [scheme] §7- Reveal with color scheme");
+        player.sendMessage("§e/revealmap reveal [depth] [theme] §7- Render the held map (scales 0-4)");
         player.sendMessage("§e/revealmap lock §7- Lock map to prevent updates");
         player.sendMessage("§e/revealmap schemes §7- List available color schemes");
         if (player.hasPermission("maprevealer.wall.manage")) {
@@ -173,10 +175,10 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        final Integer finalDepth = depth;
+        final Integer finalDepth = plugin.renderer().effectiveDepth(renderWorld, depth);
         final ColorScheme finalScheme = colorScheme;
         
-        String depthInfo = depth != null ? " at Y=" + depth : " (surface)";
+        String depthInfo = finalDepth != null ? " at Y=" + finalDepth : " (surface)";
         String schemeInfo = colorScheme != ColorScheme.NORMAL ? " with §d" + colorScheme.getId() + "§a scheme" : "";
         player.sendMessage("§aRevealing map" + depthInfo + schemeInfo + "... This may take a moment.");
 
@@ -186,11 +188,12 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
                 if (player.isOnline()) player.sendMessage("§cMap reveal failed: " + result.error());
                 return;
             }
-            if (finalScheme != ColorScheme.NORMAL && !MapRevealer.isMapLocked(mapView)) {
+            if ((finalScheme != ColorScheme.NORMAL || finalDepth != null) && !MapRevealer.isMapLocked(mapView)) {
                 MapRevealer.lockMap(mapView);
             }
             long duration = System.currentTimeMillis() - startTime;
             if (player.isOnline()) {
+                player.sendMap(mapView);
                 player.sendMessage("§aMap revealed successfully! §7(" + result.changedPixels()
                         + " changed pixels, " + duration + "ms)");
                 player.sendMessage("§7Map Center: " + mapView.getCenterX() + ", " + mapView.getCenterZ());
@@ -224,6 +227,8 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
             player.sendMessage("§e/revealmap wall set <name> interval <minutes>");
             player.sendMessage("§e/revealmap wall set <name> <locked|markers|auto-expand> <on|off>");
             player.sendMessage("§e/revealmap wall set <name> label <text|off>");
+            player.sendMessage("§e/revealmap wall set <name> theme <theme> §7- Apply sepia, nether, and other themes");
+            player.sendMessage("§e/revealmap wall set <name> depth <Y|auto> §7- Choose terrain height; Nether defaults to Y=64");
             player.sendMessage("§e/revealmap wall list §7- Show managed walls");
             player.sendMessage("§e/revealmap wall remove <name> §7- Stop managing without removing maps");
             return true;
@@ -233,7 +238,7 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
         String result;
         switch (action) {
             case "create" -> {
-                if (args.length < 2) result = "Usage: /revealmap wall create <name> [scale]";
+                if (args.length < 2 || args.length > 3) result = "Usage: /revealmap wall create <name> [scale: 0-4]";
                 else {
                     try {
                         Integer scale = args.length >= 3 ? Integer.parseInt(args[2]) : null;
@@ -270,7 +275,7 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             String partial = args[0].toLowerCase();
 
-            List<String> subCommands = new ArrayList<>(Arrays.asList("lock", "schemes", "colors", "help"));
+            List<String> subCommands = new ArrayList<>(Arrays.asList("reveal", "lock", "schemes", "colors", "help"));
             if (sender.hasPermission("maprevealer.wall.manage")) subCommands.add("wall");
             for (String sub : subCommands) {
                 if (sub.startsWith(partial)) {
@@ -285,6 +290,8 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
             }
         } else if (args[0].equalsIgnoreCase("wall")) {
             return completeWall(args);
+        } else if (args[0].equalsIgnoreCase("reveal") && args.length <= 3) {
+            return prefix(Arrays.stream(ColorScheme.values()).map(ColorScheme::getId).toList(), args[args.length - 1]);
         } else if (args.length == 2) {
             String partial = args[1].toLowerCase();
 
@@ -315,14 +322,20 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
             return prefix(names, args[2]);
         }
         if (args.length == 4 && args[1].equalsIgnoreCase("set")) {
-            return prefix(List.of("interval", "locked", "markers", "auto-expand", "label"), args[3]);
+            return prefix(List.of("theme", "depth", "interval", "locked", "markers", "auto-expand", "label"), args[3]);
+        }
+        if (args.length == 5 && args[1].equalsIgnoreCase("set") && List.of("theme", "scheme").contains(args[3].toLowerCase())) {
+            return prefix(Arrays.stream(ColorScheme.values()).map(ColorScheme::getId).toList(), args[4]);
+        }
+        if (args.length == 5 && args[1].equalsIgnoreCase("set") && args[3].equalsIgnoreCase("depth")) {
+            return prefix(List.of("auto", "32", "64", "96"), args[4]);
         }
         if (args.length == 5 && args[1].equalsIgnoreCase("set")
                 && List.of("locked", "markers", "auto-expand").contains(args[3].toLowerCase())) {
             return prefix(List.of("on", "off"), args[4]);
         }
         if (args.length == 4 && args[1].equalsIgnoreCase("create")) {
-            return prefix(List.of("0", "1"), args[3]);
+            return prefix(List.of("0", "1", "2", "3", "4"), args[3]);
         }
         return List.of();
     }

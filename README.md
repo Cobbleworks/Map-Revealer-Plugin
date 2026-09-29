@@ -15,7 +15,8 @@ Map Revealer renders the terrain covered by a filled map without requiring a pla
 ## Core Features
 
 - Renders all 128 × 128 pixels of the map held in the player's main hand
-- Supports surface rendering and fixed Y-level slices
+- Supports all five Minecraft map scales (0–4), surface rendering, and fixed Y-level slices
+- Renders Overworld terrain, End islands with transparent void, and Nether slices below the bedrock roof
 - Includes normal colors and nine themed palettes
 - Preserves terrain shading while applying themed colors
 - Automatically locks maps rendered with a themed scheme
@@ -75,10 +76,12 @@ None. Map Revealer is self-contained and does not hook into a permissions plugin
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `rendering.generate-missing-chunks` | `false` | Allow a reveal to generate terrain that does not exist yet |
-| `rendering.max-chunks-per-map` | `4096` | Refuse a single map render above this terrain-chunk count |
+| `rendering.max-chunks-per-map` | `16384` | Refuse a single map render above this terrain-chunk count |
+| `rendering.capture-chunks-per-tick` | `16` | Maximum chunk captures requested per batch |
+| `rendering.nether-depth` | `64` | Default downward slice in Nether worlds; avoids the roof |
 | `rendering.max-pending-maps` | `256` | Maximum queued wall or held-map renders |
 | `map-walls.max-frames` | `256` | Maximum maps managed by one wall |
-| `map-walls.max-scale` | `1` | Largest scale accepted when creating or adopting a wall |
+| `map-walls.max-scale` | `4` | Largest scale accepted when creating or adopting a wall |
 | `map-walls.discovery-span` | `24` | Maximum frame discovery distance from the selected frame |
 | `map-walls.minimum-refresh-minutes` | `5` | Lowest per-wall interval accepted by commands |
 | `map-walls.defaults.refresh-minutes` | `30` | Initial automatic refresh interval |
@@ -86,11 +89,29 @@ None. Map Revealer is self-contained and does not hook into a permissions plugin
 | `map-walls.defaults.player-markers` | `false` | Show online players on new walls |
 | `map-walls.defaults.auto-expand` | `false` | Automatically claim a newly placed adjacent empty frame |
 
+When upgrading an older configuration without `config-version`, the previous shipped limits (`max-scale: 1` and `max-chunks-per-map: 4096`) are upgraded automatically. Other customized limits are preserved. Nether depth and capture limits use the defaults above when absent.
+
+## Map Scales and Dimensions
+
+[Minecraft Wiki](https://minecraft.wiki/w/Tutorial:Mapping) documents five scales:
+
+| Scale | Blocks per pixel | Terrain covered by each map |
+|-------|------------------|-----------------------------|
+| `0` | 1 | 128 × 128 |
+| `1` | 2 | 256 × 256 |
+| `2` | 4 | 512 × 512 |
+| `3` | 8 | 1024 × 1024 |
+| `4` | 16 | 2048 × 2048 |
+
+All scales work for held maps and walls. Larger scales take longer to load, particularly when generating new terrain. Chunk capture runs in bounded strips rather than keeping an entire scale-4 map's snapshots in memory.
+
+In the End, islands render normally and void remains transparent. In the Nether, automatic rendering samples downward from `rendering.nether-depth` (Y=64 by default), exposing lava, terrain, and structures below the roof. A depth slice shows one layer of the dimension: choose another Y-level to reveal a different floor. A `nether` color theme changes colors independently of the world's dimension.
+
 ## Using Map Revealer
 
 The command samples one world position for every map pixel. The map's own world, center, and scale determine the sampled X/Z coordinates.
 
-- With no depth, each pixel uses the world's surface and skips fully transparent blocks.
+- With no depth, each pixel uses the world's surface and skips fully transparent blocks. Nether worlds use the configured below-roof slice instead.
 - With a depth, sampling begins at the requested Y-level and moves downward past air or transparent blocks.
 - Water and foliage receive specialized color handling; surrounding elevation is used for terrain shading.
 - A themed color scheme remaps the calculated Minecraft map color while retaining its shade where appropriate.
@@ -121,6 +142,8 @@ Creation stops before making changes if it encounters an irregular frame shape, 
 
 Every wall has its own interval, initially `30` minutes. Refresh jobs are serialized so large walls cannot start all of their maps simultaneously. Paper loads existing terrain chunks asynchronously, immutable chunk snapshots are processed off-thread, and the resulting colors are applied on the server thread. The map writer compares the new buffer with the saved vanilla buffer and marks only changed pixels dirty.
 
+Set a persistent theme with `/revealmap wall set <name> theme sepia` (or `nether`, `ender`, etc.). Use `/revealmap wall set <name> depth 64` for a fixed slice, or `depth auto` for the dimension default. These settings queue a refresh automatically and survive restarts. Themed, depth-sliced, and Nether wall maps stay locked to preserve their pixels.
+
 Use `/revealmap wall refresh <name>` for an immediate administrative refresh. Frames that are unloaded, removed, emptied, or contain a different map are skipped rather than repaired or overwritten.
 
 ### Markers, Labels, Locking, and Expansion
@@ -148,7 +171,7 @@ There are 10 scheme values: the standard palette plus nine themed alternatives.
 | `ocean` | Blue and green nautical tones |
 | `autumn` | Orange and brown seasonal tones |
 
-Any scheme other than `normal` is locked automatically after rendering. Normal maps remain able to update through ordinary Minecraft exploration unless `/revealmap lock` is used.
+Any scheme other than `normal`, or any depth slice, is locked automatically after rendering. Normal maps remain able to update through ordinary Minecraft exploration unless `/revealmap lock` is used.
 
 ## Commands
 
@@ -156,6 +179,7 @@ Any scheme other than `normal` is locked automatically after rendering. Normal m
 
 | Command | Description |
 |---------|-------------|
+| `/revealmap reveal [depth] [theme]` | Render the held map with explicit command structure. The shorter forms below remain supported. |
 | `/revealmap` | Render the held map at surface level with normal colors. |
 | `/revealmap <depth>` | Render from a specific Y-level within the current world's height bounds. |
 | `/revealmap <scheme>` | Render the surface with one of the listed schemes. |
@@ -166,6 +190,8 @@ Any scheme other than `normal` is locked automatically after rendering. Normal m
 | `/revealmap wall create <name> [scale]` | Create or safely adopt the connected rectangular frame wall being viewed. |
 | `/revealmap wall expand <name>` | Add connected empty frames around the managed frame being viewed. |
 | `/revealmap wall refresh <name\|all>` | Force an immediate terrain refresh. |
+| `/revealmap wall set <name> theme <theme>` | Apply and save a wall theme, then refresh it. |
+| `/revealmap wall set <name> depth <Y\|auto>` | Choose a slice or the dimension default, then refresh it. |
 | `/revealmap wall set <name> interval <minutes>` | Change the automatic refresh interval. |
 | `/revealmap wall set <name> <locked\|markers\|auto-expand> <on\|off>` | Change a boolean wall option. |
 | `/revealmap wall set <name> label <text\|off>` | Add or remove the origin-map region label. |
@@ -179,6 +205,9 @@ Examples:
 /revealmap sepia
 /revealmap -10 grayscale
 /revealmap mystic 32
+/revealmap wall create atlas 4
+/revealmap wall set atlas theme sepia
+/revealmap wall set atlas depth auto
 ```
 
 ## Permissions
@@ -192,7 +221,7 @@ Examples:
 
 - Larger map scales sample positions farther apart but still render 16,384 pixels.
 - Revealing terrain may load generated world chunks covered by the map, so test queue and chunk limits under normal server load before creating a very large wall.
-- Scale 3 and 4 maps can address thousands of terrain chunks. Managed walls default to scales 0–1, and `max-chunks-per-map` provides a hard safety limit.
+- Scale 3 and 4 maps can address thousands of terrain chunks. Managed walls support scales 0–4 by default, and `max-chunks-per-map` provides a hard safety limit.
 - The plugin uses Paper's public locking API. Persistent pixel-buffer access remains version-sensitive because Bukkit does not expose a public saved-map pixel writer; verify a test map after a major server implementation update.
 - Completion output includes changed pixels, map center, scale, selected depth, scheme, and elapsed time.
 

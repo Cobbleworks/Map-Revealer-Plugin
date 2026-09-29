@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-30
+
+### Added
+
+- Support all five Minecraft map scales (0–4) for managed walls, including scale-4 chunk limits and tab completion.
+- Persist wall themes and rendering depth; `/revealmap wall set <name> theme <theme>` and `depth <Y|auto>` refresh automatically.
+- Add explicit `/revealmap reveal [depth] [theme]` while preserving existing command forms.
+- Render Nether terrain below the roof at configurable Y=64 by default for walls and held maps.
+
+### Fixed
+
+- Handle below-minimum heights in empty End columns without aborting map rendering; preserve transparent void pixels.
+- Resend completed wall maps to nearby clients, after wall completion, and when players join, teleport, or change dimensions.
+- Support modern Paper map dirty methods and invalidate the entire changed pixel rectangle.
+
+### Changed
+
+- Capture snapshots on the server thread in bounded batches and sample large maps in strips to limit memory and chunk-load bursts.
+- Upgrade previous shipped configuration limits while preserving custom limits; report ungenerated terrain and render failures.
+- Keep themed, sliced, and Nether maps locked so vanilla exploration cannot replace their pixels.
+## [1.1.0] - 2026-09-04
+
 ### Added
 
 - Added persistent, automatically refreshed item-frame and glow-item-frame map walls.

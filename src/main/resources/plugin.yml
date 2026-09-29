@@ -15,9 +15,12 @@ commands:
       /revealmap - Reveal the map in your hand
       /revealmap [depth] - Reveal at specific Y level
       /revealmap [depth] [scheme] - Reveal with a color scheme
+      /revealmap reveal [depth] [theme] - Render the held map explicitly
       /revealmap lock - Lock map to prevent updates
       /revealmap schemes - List available color schemes
       /revealmap wall - Manage automatically refreshed item-frame map walls
+      /revealmap wall set <name> theme <theme> - Apply a wall theme
+      /revealmap wall set <name> depth <Y|auto> - Choose wall capture height
       /revealmap help - Show help
     aliases: [reveal, mapreveal]
 

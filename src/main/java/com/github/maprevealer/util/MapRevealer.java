@@ -47,36 +47,45 @@ public class MapRevealer {
 
     public static byte[] renderPixels(TerrainReader terrain, int centerX, int centerZ, int scale,
                                       Integer depth, ColorScheme colorScheme) {
-        byte[] pixels = new byte[MAP_SIZE * MAP_SIZE];
+        TerrainSamples samples = new TerrainSamples();
+        sampleRows(terrain, centerX, centerZ, scale, depth, samples, 0, MAP_SIZE);
+        return colorPixels(samples, colorScheme);
+    }
+
+    /** Accumulates a bounded strip of snapshots without retaining entire large maps in memory. */
+    static void sampleRows(TerrainReader terrain, int centerX, int centerZ, int scale,
+                           Integer depth, TerrainSamples samples, int firstRow, int endRow) {
         int halfMapBlocks = (MAP_SIZE / 2) * scale;
 
-        int[][] heights = new int[MAP_SIZE][MAP_SIZE];
-        byte[][] baseColors = new byte[MAP_SIZE][MAP_SIZE];
-        boolean[][] isWater = new boolean[MAP_SIZE][MAP_SIZE];
-
         for (int pixelX = 0; pixelX < MAP_SIZE; pixelX++) {
-            for (int pixelZ = 0; pixelZ < MAP_SIZE; pixelZ++) {
+            for (int pixelZ = firstRow; pixelZ < endRow; pixelZ++) {
                 int worldX = centerX - halfMapBlocks + (pixelX * scale) + (scale / 2);
                 int worldZ = centerZ - halfMapBlocks + (pixelZ * scale) + (scale / 2);
 
                 HeightColorData data = getHeightAndColor(terrain, worldX, worldZ, depth);
-                heights[pixelX][pixelZ] = data.height;
-                baseColors[pixelX][pixelZ] = data.baseColor;
-                isWater[pixelX][pixelZ] = data.isWater;
+                samples.heights[pixelX][pixelZ] = data.height;
+                samples.baseColors[pixelX][pixelZ] = data.baseColor;
+                samples.isWater[pixelX][pixelZ] = data.isWater;
             }
         }
 
+    }
+
+    static byte[] colorPixels(TerrainSamples samples, ColorScheme colorScheme) {
+        byte[] pixels = new byte[MAP_SIZE * MAP_SIZE];
         ColorScheme scheme = colorScheme != null ? colorScheme : ColorScheme.NORMAL;
         
         for (int pixelX = 0; pixelX < MAP_SIZE; pixelX++) {
             for (int pixelZ = 0; pixelZ < MAP_SIZE; pixelZ++) {
-                byte baseColor = baseColors[pixelX][pixelZ];
+                byte baseColor = samples.baseColors[pixelX][pixelZ];
                 byte finalColor;
                 
-                if (isWater[pixelX][pixelZ]) {
+                if (baseColor == 0) {
+                    finalColor = 0;
+                } else if (samples.isWater[pixelX][pixelZ]) {
                     finalColor = scheme.transformColor(baseColor);
                 } else {
-                    int shade = calculateShade(heights, pixelX, pixelZ);
+                    int shade = calculateShade(samples.heights, pixelX, pixelZ);
                     
                     finalColor = scheme.transformColor(applyShade(baseColor, shade));
                 }
@@ -85,6 +94,12 @@ public class MapRevealer {
             }
         }
         return pixels;
+    }
+
+    static final class TerrainSamples {
+        final int[][] heights = new int[MAP_SIZE][MAP_SIZE];
+        final byte[][] baseColors = new byte[MAP_SIZE][MAP_SIZE];
+        final boolean[][] isWater = new boolean[MAP_SIZE][MAP_SIZE];
     }
 
     private static class HeightColorData {
@@ -108,6 +123,10 @@ public class MapRevealer {
             startY = terrain.getHighestBlockYAt(worldX, worldZ);
         }
 
+        // Empty End columns report minHeight - 1. Never read outside the snapshot's bounds.
+        if (startY < terrain.getMinHeight()) {
+            return new HeightColorData(terrain.getMinHeight(), (byte) 0, false);
+        }
         Material block = terrain.getBlockType(worldX, startY, worldZ);
         
         while (block.isAir() || isFullyTransparent(block)) {

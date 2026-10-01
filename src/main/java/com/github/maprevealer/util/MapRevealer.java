@@ -62,6 +62,8 @@ public class MapRevealer {
                 int worldX = centerX - halfMapBlocks + (pixelX * scale) + (scale / 2);
                 int worldZ = centerZ - halfMapBlocks + (pixelZ * scale) + (scale / 2);
 
+                if (!terrain.isAvailable(worldX, worldZ)) continue;
+
                 HeightColorData data = getHeightAndColor(terrain, worldX, worldZ, depth);
                 samples.heights[pixelX][pixelZ] = data.height;
                 samples.baseColors[pixelX][pixelZ] = data.baseColor;
@@ -248,6 +250,7 @@ public class MapRevealer {
     }
 
     public interface TerrainReader {
+        default boolean isAvailable(int worldX, int worldZ) { return true; }
         Material getBlockType(int worldX, int y, int worldZ);
         int getHighestBlockYAt(int worldX, int worldZ);
         int getMinHeight();

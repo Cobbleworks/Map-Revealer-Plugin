@@ -78,6 +78,7 @@ None. Map Revealer is self-contained and does not hook into a permissions plugin
 | `rendering.generate-missing-chunks` | `false` | Allow a reveal to generate terrain that does not exist yet |
 | `rendering.max-chunks-per-map` | `16384` | Refuse a single map render above this terrain-chunk count |
 | `rendering.capture-chunks-per-tick` | `16` | Maximum chunk captures requested per batch |
+| `rendering.lookup-chunks-per-tick` | `256` | Maximum asynchronous chunk lookups per server tick; snapshots still obey the capture limit |
 | `rendering.nether-depth` | `64` | Default downward slice in Nether worlds; avoids the roof |
 | `rendering.max-pending-maps` | `256` | Maximum queued wall or held-map renders |
 | `map-walls.max-frames` | `256` | Maximum maps managed by one wall |
@@ -103,7 +104,9 @@ When upgrading an older configuration without `config-version`, the previous shi
 | `3` | 8 | 1024 × 1024 |
 | `4` | 16 | 2048 × 2048 |
 
-All scales work for held maps and walls. Larger scales take longer to load, particularly when generating new terrain. Chunk capture runs in bounded strips rather than keeping an entire scale-4 map's snapshots in memory.
+All scales work for held maps and walls. Larger scales take longer to load, particularly when generating new terrain. Chunk capture runs in bounded strips rather than keeping an entire scale-4 map's snapshots in memory. Terrain appears progressively, starting with maps nearest the selected frame, and wall refreshes report progress every ten seconds.
+
+A **10×10 wall at scale 4 covers 20,480×20,480 blocks**, or up to **1,638,400 chunks**. Frame contents appear immediately, but terrain rendering follows through the queue. With the default `generate-missing-chunks: false`, unexplored, ungenerated terrain remains transparent permanently until it exists and the wall is refreshed. Waiting alone cannot fill that terrain. Start with scale 0 or 1 for a local wall, or explore/pregenerate the larger area and run `/revealmap wall refresh <name>`. Completion messages report missing chunks and maps with no generated terrain. Existing End void also remains transparent by design.
 
 In the End, islands render normally and void remains transparent. In the Nether, automatic rendering samples downward from `rendering.nether-depth` (Y=64 by default), exposing lava, terrain, and structures below the roof. A depth slice shows one layer of the dimension: choose another Y-level to reveal a different floor. A `nether` color theme changes colors independently of the world's dimension.
 

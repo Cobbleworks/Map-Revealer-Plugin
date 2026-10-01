@@ -13,6 +13,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MapRenderServiceTest {
     @Test
+    void missingTerrainAtExplicitDepthIsTransparentWithoutScanningAirColumns() {
+        MapRevealer.TerrainReader terrain = new MapRevealer.TerrainReader() {
+            @Override public boolean isAvailable(int x, int z) { return false; }
+            @Override public Material getBlockType(int x, int y, int z) { throw new AssertionError("Missing chunk was read"); }
+            @Override public int getHighestBlockYAt(int x, int z) { throw new AssertionError("Missing chunk was read"); }
+            @Override public int getMinHeight() { return 0; }
+        };
+        assertArrayEquals(new byte[16384], MapRevealer.renderPixels(terrain, 0, 0, 16, 64, ColorScheme.NORMAL));
+    }
+    @Test
     void scaleZeroMapRequestsEightByEightChunks() {
         assertEquals(64, MapRenderService.requiredChunks(0, 0, 1).size());
     }
@@ -28,7 +38,7 @@ class MapRenderServiceTest {
             int scale = 1 << level;
             var all = MapRenderService.requiredChunks(-17, 23, scale);
             var strips = new java.util.HashSet<Long>();
-            int rows = Math.max(1, 16 / scale);
+            int rows = Math.max(1, 32 / scale);
             for (int z = 0; z < 128; z += rows) {
                 var strip = MapRenderService.requiredChunks(-17, 23, scale, z, Math.min(128, z + rows));
                 assertTrue(strip.size() <= 256, "Snapshot strips must remain bounded at scale " + level);

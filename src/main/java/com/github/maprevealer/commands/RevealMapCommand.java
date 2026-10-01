@@ -188,7 +188,8 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
                 if (player.isOnline()) player.sendMessage("§cMap reveal failed: " + result.error());
                 return;
             }
-            if ((finalScheme != ColorScheme.NORMAL || finalDepth != null) && !MapRevealer.isMapLocked(mapView)) {
+            if ((finalScheme != ColorScheme.NORMAL || finalDepth != null
+                    || renderWorld.getEnvironment() == World.Environment.NETHER) && !MapRevealer.isMapLocked(mapView)) {
                 MapRevealer.lockMap(mapView);
             }
             long duration = System.currentTimeMillis() - startTime;
@@ -209,7 +210,7 @@ public class RevealMapCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage("§7Color Scheme: " + finalScheme.getId() + " (map locked to preserve scheme)");
                 }
             }
-        });
+        }, rows -> { if (player.isOnline()) player.sendMap(mapView); });
 
         return true;
     }

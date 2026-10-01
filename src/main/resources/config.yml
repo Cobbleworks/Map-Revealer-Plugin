@@ -8,6 +8,8 @@ rendering:
   max-chunks-per-map: 16384
   # Limit concurrent loads/snapshots. Large maps are sampled in strips to bound memory usage.
   capture-chunks-per-tick: 16
+  # Missing terrain needs no snapshot. Bound async existence/load requests separately.
+  lookup-chunks-per-tick: 256
   # Default downward terrain slice in the Nether; avoids the bedrock roof.
   nether-depth: 64
   max-pending-maps: 256

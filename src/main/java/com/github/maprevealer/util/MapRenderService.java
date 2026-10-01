@@ -2,6 +2,7 @@ package com.github.maprevealer.util;
 
 import com.github.maprevealer.MapRevealerPlugin;
 import org.bukkit.Chunk;
+import org.bukkit.Bukkit;
 import org.bukkit.ChunkSnapshot;
 import org.bukkit.World;
 import org.bukkit.map.MapView;
@@ -29,6 +30,9 @@ public final class MapRenderService {
     private final Queue<Request> queue = new ArrayDeque<>();
     private boolean rendering;
     private boolean stopped;
+    private int captureTick = -1;
+    private int snapshotsThisTick;
+    private int lookupsThisTick;
 
     public MapRenderService(MapRevealerPlugin plugin) {
         this.plugin = plugin;
@@ -36,6 +40,11 @@ public final class MapRenderService {
 
     public void render(MapView map, World world, Integer depth, ColorScheme scheme,
                        Consumer<RenderResult> callback) {
+        render(map, world, depth, scheme, callback, rows -> { });
+    }
+
+    public void render(MapView map, World world, Integer depth, ColorScheme scheme,
+                       Consumer<RenderResult> callback, Consumer<Integer> progress) {
         if (stopped) {
             callback.accept(RenderResult.failure("Map rendering is shutting down."));
             return;
@@ -45,7 +54,7 @@ public final class MapRenderService {
             callback.accept(RenderResult.failure("The map render queue is full."));
             return;
         }
-        queue.add(new Request(map, world, depth, scheme == null ? ColorScheme.NORMAL : scheme, callback));
+        queue.add(new Request(map, world, depth, scheme == null ? ColorScheme.NORMAL : scheme, callback, progress));
         startNext();
     }
 
@@ -68,8 +77,13 @@ public final class MapRenderService {
         }
 
         Integer depth = effectiveDepth(request.world(), request.depth());
-        renderStrip(request, centerX, centerZ, scale, minHeight, depth,
-                new MapRevealer.TerrainSamples(), new LinkedHashSet<>(), keys.size(), 0);
+        try {
+            renderStrip(request, centerX, centerZ, scale, minHeight, depth,
+                    new MapRevealer.TerrainSamples(), new LinkedHashSet<>(), keys.size(), 0,
+                    MapDataAccess.read(request.map()), 0);
+        } catch (RuntimeException exception) {
+            finish(request, RenderResult.failure(exception.getMessage()));
+        }
     }
 
     public Integer effectiveDepth(World world, Integer depth) {
@@ -81,9 +95,9 @@ public final class MapRenderService {
 
     private void renderStrip(Request request, int centerX, int centerZ, int scale, int minHeight,
                              Integer depth, MapRevealer.TerrainSamples samples, Set<Long> captured,
-                             int requestedChunks, int firstRow) {
+                             int requestedChunks, int firstRow, byte[] buffer, int changedPixels) {
         if (stopped) return;
-        int endRow = Math.min(MAP_SIZE, firstRow + Math.max(1, 16 / scale));
+        int endRow = Math.min(MAP_SIZE, firstRow + Math.max(1, 32 / scale));
         Set<Long> keys = requiredChunks(centerX, centerZ, scale, firstRow, endRow);
         capture(request.world(), keys).whenComplete((snapshots, throwable) -> {
             if (stopped) return;
@@ -91,23 +105,39 @@ public final class MapRenderService {
                 runSync(() -> finish(request, RenderResult.failure("Could not load terrain: " + throwable.getMessage())));
                 return;
             }
-            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            Runnable process = () -> {
                 try {
                     MapRevealer.sampleRows(new SnapshotTerrain(snapshots, minHeight),
                             centerX, centerZ, scale, depth, samples, firstRow, endRow);
                     captured.addAll(snapshots.keySet());
-                    if (endRow < MAP_SIZE) {
-                        runSync(() -> renderStrip(request, centerX, centerZ, scale, minHeight,
-                                depth, samples, captured, requestedChunks, endRow));
-                    } else {
+                    boolean publish = endRow % 8 == 0 || endRow == MAP_SIZE;
+                    if (publish) {
                         byte[] pixels = MapRevealer.colorPixels(samples, request.scheme());
-                        String hash = hash(pixels);
-                        runSync(() -> apply(request, pixels, hash, captured.size(), requestedChunks));
+                        System.arraycopy(pixels, 0, buffer, 0, endRow * MAP_SIZE);
                     }
+                    runSync(() -> {
+                        try {
+                            int changed = changedPixels;
+                            if (publish) {
+                                changed += MapDataAccess.write(request.map(), buffer);
+                                request.progress().accept(endRow);
+                            }
+                            if (endRow < MAP_SIZE) renderStrip(request, centerX, centerZ, scale, minHeight,
+                                    depth, samples, captured, requestedChunks, endRow, buffer, changed);
+                            else finish(request, new RenderResult(true, changed, hash(buffer),
+                                    captured.size(), requestedChunks, null));
+                        } catch (RuntimeException exception) {
+                            finish(request, RenderResult.failure(exception.getMessage()));
+                        }
+                    });
                 } catch (RuntimeException exception) {
                     runSync(() -> finish(request, RenderResult.failure("Could not process terrain: " + exception.getMessage())));
                 }
-            });
+            };
+            // An absent strip has no terrain work. Avoid an async/sync round trip for
+            // every empty row in a large wall; lookup and capture budgets still apply.
+            if (snapshots.isEmpty()) process.run();
+            else plugin.getServer().getScheduler().runTaskAsynchronously(plugin, process);
         });
     }
 
@@ -117,45 +147,72 @@ public final class MapRenderService {
         return result;
     }
 
+    private void resetCaptureBudget() {
+        int tick = Bukkit.getCurrentTick();
+        if (captureTick != tick) {
+            captureTick = tick;
+            snapshotsThisTick = 0;
+            lookupsThisTick = 0;
+        }
+    }
+
     private void captureBatch(World world, List<Long> keys, int start, Map<Long, ChunkSnapshot> snapshots,
                               CompletableFuture<Map<Long, ChunkSnapshot>> result) {
         if (stopped) return;
-        boolean generate = plugin.getConfig().getBoolean("rendering.generate-missing-chunks", false);
-        int end = Math.min(keys.size(), start + Math.max(1,
-                plugin.getConfig().getInt("rendering.capture-chunks-per-tick", 16)));
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
-        for (long key : keys.subList(start, end)) {
-            int chunkX = (int) (key >> 32);
-            int chunkZ = (int) key;
-            if (!generate && !world.isChunkGenerated(chunkX, chunkZ)) continue;
-            CompletableFuture<Chunk> chunkFuture = world.isChunkLoaded(chunkX, chunkZ)
-                    ? CompletableFuture.completedFuture(world.getChunkAt(chunkX, chunkZ))
-                    : world.getChunkAtAsync(chunkX, chunkZ, generate);
-            CompletableFuture<Void> snapshotFuture = new CompletableFuture<>();
-            chunkFuture.whenComplete((chunk, failure) -> runSync(() -> {
-                if (failure != null) { snapshotFuture.completeExceptionally(failure); return; }
-                try {
-                    if (chunk == null) throw new IllegalStateException("Chunk " + chunkX + "," + chunkZ + " could not be loaded.");
-                    snapshots.put(key, chunk.getChunkSnapshot(true, false, false));
-                    snapshotFuture.complete(null);
-                } catch (RuntimeException exception) { snapshotFuture.completeExceptionally(exception); }
-            }));
-            futures.add(snapshotFuture);
+        resetCaptureBudget();
+        int captureLimit = Math.max(1, plugin.getConfig().getInt("rendering.capture-chunks-per-tick", 16));
+        int lookupLimit = Math.max(captureLimit, plugin.getConfig().getInt("rendering.lookup-chunks-per-tick", 256));
+        if (lookupsThisTick >= lookupLimit) {
+            plugin.getServer().getScheduler().runTaskLater(plugin,
+                    () -> captureBatch(world, keys, start, snapshots, result), 1L);
+            return;
         }
-        CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).whenComplete((ignored, failure) -> {
+        boolean generate = plugin.getConfig().getBoolean("rendering.generate-missing-chunks", false);
+        int batchSize = generate ? Math.min(captureLimit, lookupLimit - lookupsThisTick) : lookupLimit - lookupsThisTick;
+        int end = Math.min(keys.size(), start + batchSize);
+        lookupsThisTick += end - start;
+        List<CompletableFuture<Chunk>> futures = new ArrayList<>();
+        try {
+            for (long key : keys.subList(start, end)) {
+                int chunkX = (int) (key >> 32);
+                int chunkZ = (int) key;
+                // isChunkGenerated blocks on disk I/O on Paper. Non-generating async
+                // loads return null for missing terrain without blocking a server tick.
+                futures.add(world.isChunkLoaded(chunkX, chunkZ)
+                        ? CompletableFuture.completedFuture(world.getChunkAt(chunkX, chunkZ))
+                        : world.getChunkAtAsync(chunkX, chunkZ, generate));
+            }
+        } catch (RuntimeException exception) { result.completeExceptionally(exception); return; }
+        CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).whenComplete((ignored, failure) -> runSync(() -> {
             if (failure != null) result.completeExceptionally(failure);
-            else if (end == keys.size()) result.complete(snapshots);
-            else runSync(() -> captureBatch(world, keys, end, snapshots, result));
-        });
+            else captureSnapshots(world, keys, start, end, snapshots, result, futures, 0, generate);
+        }));
     }
 
-    private void apply(Request request, byte[] pixels, String hash, int capturedChunks, int requestedChunks) {
-        try {
-            int changed = MapDataAccess.write(request.map(), pixels);
-            finish(request, new RenderResult(true, changed, hash, capturedChunks, requestedChunks, null));
-        } catch (RuntimeException exception) {
-            finish(request, RenderResult.failure(exception.getMessage()));
+    private void captureSnapshots(World world, List<Long> keys, int start, int end,
+                                  Map<Long, ChunkSnapshot> snapshots, CompletableFuture<Map<Long, ChunkSnapshot>> result,
+                                  List<CompletableFuture<Chunk>> futures, int first, boolean generate) {
+        if (stopped) return;
+        resetCaptureBudget();
+        int captureLimit = Math.max(1, plugin.getConfig().getInt("rendering.capture-chunks-per-tick", 16));
+        for (int index = first; index < futures.size(); index++) {
+            Chunk chunk = futures.get(index).join(); // allOf has already completed; never blocks.
+            if (chunk == null) {
+                if (generate) { result.completeExceptionally(new IllegalStateException("Terrain could not be generated.")); return; }
+                continue;
+            }
+            if (snapshotsThisTick >= captureLimit) {
+                int next = index;
+                plugin.getServer().getScheduler().runTaskLater(plugin,
+                        () -> captureSnapshots(world, keys, start, end, snapshots, result, futures, next, generate), 1L);
+                return;
+            }
+            try { snapshots.put(keys.get(start + index), chunk.getChunkSnapshot(true, false, false)); }
+            catch (RuntimeException exception) { result.completeExceptionally(exception); return; }
+            snapshotsThisTick++;
         }
+        if (end == keys.size()) result.complete(snapshots);
+        else captureBatch(world, keys, end, snapshots, result);
     }
 
     private void finish(Request request, RenderResult result) {
@@ -168,7 +225,12 @@ public final class MapRenderService {
     }
 
     private void runSync(Runnable runnable) {
-        if (!stopped) plugin.getServer().getScheduler().runTask(plugin, () -> {
+        if (stopped) return;
+        if (Bukkit.isPrimaryThread()) {
+            runnable.run();
+            return;
+        }
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
             if (!stopped) runnable.run();
         });
     }
@@ -205,7 +267,7 @@ public final class MapRenderService {
     }
 
     private record Request(MapView map, World world, Integer depth, ColorScheme scheme,
-                           Consumer<RenderResult> callback) { }
+                           Consumer<RenderResult> callback, Consumer<Integer> progress) { }
 
     public record RenderResult(boolean success, int changedPixels, String hash,
                                int capturedChunks, int requestedChunks, String error) {

@@ -32,6 +32,7 @@ import org.bukkit.map.MapView;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.RayTraceResult;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.io.IOException;
@@ -344,7 +345,9 @@ public final class MapWallManager implements Listener {
             return;
         }
         wall.nextRefresh(System.currentTimeMillis() + wall.refreshMinutes() * 60_000L);
-        List<WallFrame> eligible = wall.frames().stream().filter(frame -> validManagedMap(wall, frame)).toList();
+        List<WallFrame> eligible = wall.frames().stream().filter(frame -> validManagedMap(wall, frame))
+                .sorted(Comparator.comparingInt(frame -> Math.abs(frame.row()) + Math.abs(frame.column())))
+                .toList();
         if (eligible.isEmpty()) {
             refreshingWalls.remove(wall.name());
             if (sender != null) sender.sendMessage("No loaded, unchanged wall frames were available to refresh.");
@@ -353,13 +356,21 @@ public final class MapWallManager implements Listener {
         }
 
         RefreshProgress progress = new RefreshProgress(eligible.size(), sender, wall.name());
+        if (sender != null) {
+            MapView origin = Bukkit.getMap(eligible.get(0).mapId());
+            int width = origin == null ? 128 : 128 * (1 << origin.getScale().getValue());
+            sender.sendMessage("Rendering " + eligible.size() + " maps for '" + wall.name() + "' ("
+                    + width + " x " + width + " blocks per map). Terrain appears progressively, starting near the selected frame.");
+            if (!plugin.getConfig().getBoolean("rendering.generate-missing-chunks", false))
+                sender.sendMessage("Only existing terrain is shown. Maps outside generated terrain remain transparent; larger scales can contain mostly empty areas.");
+        }
         for (WallFrame frame : eligible) {
             MapView map = Bukkit.getMap(frame.mapId());
             if (map == null) {
                 progress.complete(MapRenderService.RenderResult.failure("map " + frame.mapId() + " is missing"));
                 continue;
             }
-            map.setLocked(wall.locked());
+            map.setLocked(wall.locked() || requiresLock(wall));
             attachOverlay(wall, frame, map);
             renderer.render(map, world, wall.depth, wall.scheme, result -> {
                 if (result.success()) frame.lastHash(result.hash());
@@ -367,6 +378,9 @@ public final class MapWallManager implements Listener {
                 if (!result.success()) plugin.getLogger().warning("Wall '" + wall.name() + "', map " + frame.mapId() + ": " + result.error());
                 progress.complete(result);
                 if (progress.done()) save();
+            }, rows -> {
+                progress.currentRows = rows;
+                if (validManagedMap(wall, frame)) sendFrameMap(wall, frame, null);
             });
         }
         if (!forced) save();
@@ -815,18 +829,27 @@ public final class MapWallManager implements Listener {
         private int changedPixels;
         private int failures;
         private int missingChunks;
+        private int emptyMaps;
+        private int currentRows;
+        private final int total;
+        private final BukkitTask notificationTask;
         private String firstError;
         private final CommandSender sender;
         private final String wall;
 
         private RefreshProgress(int remaining, CommandSender sender, String wall) {
             this.remaining = remaining;
+            this.total = remaining;
             this.sender = sender;
             this.wall = wall;
+            this.notificationTask = sender == null ? null : plugin.getServer().getScheduler().runTaskTimer(plugin,
+                    () -> sender.sendMessage("Map wall '" + wall + "': " + (total - this.remaining) + "/" + total
+                            + " maps complete; current map " + (currentRows * 100 / 128) + "%."), 200L, 200L);
         }
 
         private void complete(MapRenderService.RenderResult result) {
             remaining--;
+            currentRows = 0;
             if (!result.success()) {
                 failures++;
                 if (firstError == null) firstError = result.error();
@@ -835,13 +858,19 @@ public final class MapWallManager implements Listener {
                 changedMaps++;
                 changedPixels += result.changedPixels();
             }
-            if (result.success()) missingChunks += result.requestedChunks() - result.capturedChunks();
+            if (result.success()) {
+                missingChunks += result.requestedChunks() - result.capturedChunks();
+                if (result.capturedChunks() == 0) emptyMaps++;
+            }
             if (remaining == 0 && sender != null) {
                 sender.sendMessage("Map wall '" + wall + "' refreshed: " + changedMaps + " changed maps, "
                         + changedPixels + " changed pixels" + (failures == 0 ? "." : ", " + failures + " failures: " + firstError));
-                if (missingChunks > 0) sender.sendMessage("Ungenerated terrain was left transparent. Enable rendering.generate-missing-chunks to include new terrain.");
+                if (missingChunks > 0) sender.sendMessage(missingChunks + " terrain chunks do not exist; " + emptyMaps
+                        + " maps have no generated terrain. Use a lower scale or explore/pregenerate the area, then refresh."
+                        + " New terrain generation is opt-in via rendering.generate-missing-chunks.");
             }
             if (remaining == 0) {
+                if (notificationTask != null) notificationTask.cancel();
                 refreshingWalls.remove(wall);
                 MapWall definition = walls.get(wall);
                 if (definition != null) {

@@ -16,6 +16,11 @@ public final class SnapshotTerrain implements MapRevealer.TerrainReader {
     }
 
     @Override
+    public boolean isAvailable(int worldX, int worldZ) {
+        return chunks.containsKey(key(worldX >> 4, worldZ >> 4));
+    }
+
+    @Override
     public Material getBlockType(int worldX, int y, int worldZ) {
         ChunkSnapshot snapshot = chunks.get(key(worldX >> 4, worldZ >> 4));
         if (snapshot == null) return Material.AIR;
